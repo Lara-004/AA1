@@ -1,0 +1,119 @@
+---
+title: "Obesidad"
+author: "Marcos López García"
+date: "2025-01-31"
+output: html_document
+---
+
+```{r echo=FALSE}
+library(readr)
+library(ggplot2)
+```
+
+# Introducción
+
+Este conjunto de datos contienen la información para dar una estimación de los niveles de obesidad de personas residentes en Mexico, Perú y Colombia.
+
+Estos datos se han adquirido de [repositorio de datos de kaggle](https://www.kaggle.com/datasets/aravindpcoder/obesity-or-cvd-risk-classifyregressorcluster). Segun la descripción del repositorio, nos basamos en personas con edades entre 14 y 61 años y diversos hábitos alimenticios y condición física. Estos datos se han recolectado mediante una plataforma web con una encuesta donde usuarios anónimos respondieron cada pregunta.
+
+En este dataset podemos encontrar distintos tipos de variables:
+
+* Gender: Genero.
+* Age: Edad.
+* Height: Altura (m).
+* Weight: Peso (kg).
+* family_history_with_overweight: Antecedentes familiares.
+* FAVC: Consumo frecuente de alimentos de alto valor genético.
+* FCVC: Frecuencia de consumo deverduras.
+* NCP: Número de comidas principales.
+* CAEC: Consumo de alimentos entre comidas.
+* CH2O: Consumo de agua diariamente.
+* CALC: Consumo de alcohol.
+* SCC: Consumo de calorías.
+* FAF: Frecuencias de actividad física.
+* TUE: Tiempo utilizado dispositivos electronicos.
+* MTRANS: Transporte utilizado con frecuencia.
+* NObeyesdad: Grupos segun el nivel de obesidad, se diferencian en:
+
+  * Bajo peso: Menos de 18,5.
+  * Normal: 18,5 a 24,9.
+  * Sobrepeso: 25,0 a 29,9.
+  * Obesidad I: 30,0 a 34,9.
+  * Obesidad II: 35,0 a 39,9.
+  * Obesidad III: Mayor de 40.
+
+# Data understanding
+
+Primero de todo, vamos a cargar los datos y vamos a ver la cantidad de variables y observaciones que encontramos.
+
+```{r}
+obesidad <- read.csv("ObesityDataSet.csv")
+data <- dim(obesidad)
+```
+Podemos observar que tenemos una cantiadad de `r data[1]` observaciones y `r data[2]` variables en este dataset
+
+En estos datos, las varibles son de distintos tipos:
+```{r}
+str(obesidad)
+```
+
+Podemos ver como hay distintos tipos de variables en los datos, en el cual solo hay dos tipos, el tipo numérico `num` (`Age`, `Height`, `Weight`, `FCVV`, `NCP`, `CH2O`, `FAF`Y `TUE`) y por otro lado, tenemos vectores de caracteres `char` (`Gender`, `family_history_with_overweight`, `FAVC`, `CAEC`, `SMOKE`, `SSC`, `CALC`, `MTRANS`, `NObeyesdad`)
+
+Antes de hacer la partición de los datos para hacer un mejor análisis, vamos a observar si hay valores faltantes.
+```{r}
+colSums(is.na(obesidad))
+```
+
+Podemos observar que no hay variables de tipo NA, por lo que no es necesario hacer algún tipo de imputación sobre los datos para hacer el análisis de los datos.
+
+Realizamos la partición de nuestros datos.
+```{r}
+set.seed(1)
+
+# Indices para la partición
+nobesidad <- dim(obesidad)[1]
+indices <- 1:nobesidad
+ntrain <- nobesidad * 0.6
+indices.train <- sample(indices, ntrain, replace = FALSE)
+indices.test_val <- indices[-indices.train]
+
+# Usamos el 60% para las variables de entrenamiento
+train <- obesidad[indices.train, ]
+test_val <- obesidad[indices.test_val, ]
+
+# Creamos los indices para test y para val
+ntest_val <- dim(test_val)[1]
+indices = 1:ntest_val
+ntest <-  ntest_val * 0.5
+indices.test <- sample(indices, ntest, replace = FALSE)
+indices.val <- indices[-indices.test]
+
+# Creamos los datos de test y val
+test <- test_val[indices.test, ]
+val <- test_val[indices.val, ]
+```
+
+Miramos la información de nuestros datos de entrenamiento
+```{r}
+dim(train)
+head(train)
+str(train)
+```
+
+# EDA
+
+Antes de nada vamos a mirar como se puede ver nuetra variable objetivo, que sería el nivel de obesidad que hay en esta muestra, primero vamos a ver información sobre la variable
+
+```{r}
+summary(train$NObeyesdad)
+table(train$NObeyesdad)
+```
+
+Dado que es un caracter, vamos a hacer un grafico de barras para ver como se ve la variable
+
+```{r}
+ggplot(data = train, mapping = aes(x = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar()
+```
+
+Viendo el gráfico se puede ver que la mayoría de personas que hay en la muestra tien obesidad de tipo I. Y el segundo y tercero más frecuente son el nivel normal de peso y obesidad de tipo III, respectivamente.
