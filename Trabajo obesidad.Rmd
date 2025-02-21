@@ -117,3 +117,13 @@ ggplot(data = train, mapping = aes(x = NObeyesdad, fill = NObeyesdad)) +
 ```
 
 Viendo el gráfico se puede ver que la mayoría de personas que hay en la muestra tien obesidad de tipo I. Y el segundo y tercero más frecuente son el nivel normal de peso y obesidad de tipo III, respectivamente.
+
+Vamos a representar la obesidad segun la cantidad de comidas al día que se hacen.
+```{r}
+train$FCVC = round(train$FCVC)
+
+ggplot(train, aes(x = FCVC, fill = NObeyesdad , colour = NObeyesdad)) + 
+  geom_histogram(position = "dodge", bins = 5)
+```
+
+Podemos ver que las personas que hacen una comida son menos propensos de desrrollar obesidad de algún tipo. Por otro lado, hay una cosa que nos parece curiosa y es qe al hacer tres comidas hay bastabtes personas que han desarrollado obesidad de tipo 3 o no tienen el suficiene peso. Viendo esta tabla se puede ver que las personas hacen sobre todo 3 comidas al día.
