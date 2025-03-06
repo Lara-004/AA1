@@ -8,6 +8,12 @@ output: html_document
 ```{r echo=FALSE}
 library(readr)
 library(ggplot2)
+library(dplyr)
+library(HDclassif)
+library(MASS)
+library(gt)
+library(knitr)
+library(cluster)
 ```
 
 # Introducción
