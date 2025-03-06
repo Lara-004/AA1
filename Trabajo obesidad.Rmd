@@ -14,6 +14,11 @@ library(MASS)
 library(gt)
 library(knitr)
 library(cluster)
+library (tidyverse)
+library (factoextra)
+library (NbClust)
+library (parameters)
+library (stats)
 ```
 
 # Introducción
@@ -619,3 +624,152 @@ varianza_acumulada <- cumsum(varianza_explicada)
 varianza_acumulada
 ```
 
+#Clustering
+
+## Métodos no jerarquicos
+
+Primero, vamos a usar el método de las k-medias.
+
+El método de las k-medias es de los algoritmos de Machine Learning más utilizado para la agrupación de observaciones en un conjunto de k clústeres. Don de k es un valor que hay que fijarlo de antemano.
+
+Antes de empezar a hacer las k-medias, dado que es un algoritmo que solo admite valores tipo numéricos, vamos a crear una nueva variable para que solo tenga como columnas variables de tipo numérico y vamos a escalarlo.
+
+```{r}
+train_num <- train %>% select(Age, Height, Weight, FCVC, NCP, CH2O, FAF, TUE)
+train_esc <- scale (train_num)
+```
+
+### Número óptimo de clusters
+
+Para ver el número óptimo de clusters, vamos a usar 4 métodos: el método del codo, método de la silueta, método de Gap y usando la función NbClust.
+
+**- El método del codo**
+
+Según este método, el número mas óptimo de clusters es cuando se da un cambio abrupto en la pendiente de la función
+
+```{r}
+fviz_nbclust(train_esc, kmeans, method = "wss")
+```
+
+Analizando la gráfica que nos da, podemos decir que en **el número óptimo de clusters necesarios sería 5** si usamos el método del codo.
+
+**- Método de la silueta**
+
+Este método nos ayuda a valorar la coherencia (o calidad) de los resultados de los clusters, es decir, determina hasta qué punto cada observacion se encuentra correctamente ubicada dentro de su agrupación.
+
+Este algoritmo nos señala con una línea discontinua vertical el número mas óptimo
+
+```{r}
+fviz_nbclust(train_esc, kmeans, method = "silhouette")
+```
+
+Este algoritmo nos dice que **el número óptimo de clusters es 9**. 
+
+Viendo el gráfico y las conclusiones que sacamos de él, no es muy difícil ver que no tiene mucho sentido escoger 9 grupos, ademas de la complejidad que tendría cada grupo y lo difícil que sería diferenciarlo de los demás grupos.
+
+De todas formas, para confirmar lo que decimos, vamos a comprobar si haciendo el algoritmo de las k-medias con 9 centros (9 clusters) nos puede dar una buena agrupacion interpretando el gráfico de siluetas. 
+
+```{r}
+# k-medias con 9 centros
+k9 <- kmeans(train_esc, centers = 9, nstart = 50)
+
+# Gráfica de siluetas
+sil <- silhouette(k9$cluster, dist (train_esc))
+fviz_silhouette(sil)
+```
+
+Para interpretar el gráfico, hay que fijarse en los valores positivos y negativos. Aquellos que sean mas próximos a 1, es que la observación está bien agrupada, mientras que cuando esté mas cerca de 0 es que está mal agrupada. 
+
+Ahora, analizando la gráfica que tenemos, podemos concluir que muchos de los grupos tienen valores negativos o cerca de 0, por lo que eso es que no es una buena agrupación a pesar de que uno de los grupos cuyos valores son todos positivos (y muchos de ellos llegando a sobrepasar 0.5) es una muy buena aproximación.
+
+Es muy fácil ver que **una agrupacion de las observaciones en 9 clusters no es una buena opcion**. 
+
+
+**- Gap**
+
+Es un método que determina el número de clusters sin depender de suposiciones y así permitiendo tomar decisiones mas objetivas.
+
+```{r}
+gap_stat <- clusGap(train_num, FUN = kmeans, nstart = 25,
+                    K.max = 15, B = 50)
+
+print(gap_stat, method = "firstmax")
+
+fviz_gap_stat(gap_stat)
+```
+
+**7 clusters parece ser el número óptimo segun el método de Gap** para los datos que tenemos.
+
+**- NbClust**
+
+Vamos a terminar con este método que nos proporciona 30 índices para determinar el número relevate de clusters, ya que cada método que hemos probadoa hasta ahora nos da valores distintos para agrupar los datos.
+
+```{r}
+nb <- NbClust(train_esc, distance = "euclidean", min.nc = 2, max.nc = 12, method = "kmeans")
+```
+
+Al parecer, el número más óptimo es 2 ó 5, con 6 indices cada uno que los respalda. Vamos a ver la explicabilidad con los resultados obtenidos.
+
+```{r}
+# Con 5 clusters
+res_kmeans_n5 <-  cluster_analysis(train_esc, n = 5, method = "kmeans")
+plot (summary (res_kmeans_n5))
+
+# Con 2 clusters
+res_kmeans_n2 <-  cluster_analysis(train_esc, n = 2, method = "kmeans")
+plot (summary (res_kmeans_n2))
+```
+
+```{r}
+k5 <- kmeans(train_esc, centers = 5, nstart = 50)
+
+fviz_cluster(k5, data = train_esc, geom = "point")
+```
+
+Nos quedamos con 5 clusters porque diferencian más los grupos.
+
+## Métodos jerárquicos
+
+### Cluster Jerárquico Aglomerativo
+
+Primero vamos a entender este tipo de cluster jerárquico.
+
+Se empieza con n conglomerados, uno por cada dato (en nuestro caso, n = 2111) y en cada paso se van fusionando los 2 grupos más similares, hasta que llega a un punto en que se queda en un solo grupo que contiene a todos.
+
+Primero vamos a ver el coeficiente aglomerativo. Cuanto mas cercano a 1, más fuerte es el agrupamiento. Para tener más opiniones sobre qué tipo de método usar, vamos a ver el coeficiente aglomerativo de 4 métodos: Average, Single, Complete, Ward
+
+```{r}
+m <- c( "average", "single", "complete", "ward")
+names(m) <- c( "average", "single", "complete", "ward")
+
+# Función para calcular el coeficiente de agrupamiento
+ac <- function(x) {
+  agnes(train_esc, method = x)$ac
+}
+
+map_dbl(m, ac)
+```
+
+Dado que el coeficiente más cercano a 1 es el método Ward con un 0.9843. 
+
+```{r}
+d <- dist(train_esc, method = "euclidean")
+
+hc1 <- hclust(d, method = "ward" )
+
+# Dendrograma
+plot(hc1, cex = 0.6, hang = -1)
+```
+
+```{r}
+# Cortamos en 5 clusters
+sub_grp <- cutree(hc1, k = 5)
+
+# Visualizamos el corte en el dendrograma
+plot(hc1, cex = 0.6)
+rect.hclust(hc1, k = 5, border = 2:5)
+```
+
+```{r}
+fviz_cluster(list(data=train_esc,cluster=sub_grp), geom = "point")
+```
