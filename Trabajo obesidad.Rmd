@@ -110,7 +110,14 @@ str(train)
 
 ## Variable objetivo
 
-Vamos a visualizar la distribución de las distintas categorías dentro de la variable objetivo NObesity, que se refiere a los distintos niveles de obesidad. Esto lo haremos mediante dos gráficos de barras, en horizontal y vertical.
+Antes de nada vamos a mirar como se puede ver nuetra variable objetivo, que sería el nivel de obesidad que hay en esta muestra, primero vamos a ver información sobre la variable
+
+```{r}
+summary(train$NObeyesdad)
+table(train$NObeyesdad)
+```
+
+Vamos a visualizar la distribución de las distintas categorías dentro de la variable objetivo NObesity, que se refiere a los distintos niveles de obesidad. Esto lo haremos mediante dos gráficos de barras, en horizontal.
 
 ```{r}
 train |> 
@@ -124,6 +131,12 @@ train |>
 ```
 
 Tal y como se puede observar en el gráfico, la frecuencia de cada tipo de obesidad es bastante parecida. Podemos ver que la clase que muestra una menor frecuencia es la de peso insuficiente, por otro lado, la clase con una mayor frecuencia es la de Obesidad de tipo I, seguido del peso normal (segunda mayor frecuencia) y de la obesidad de tipo III (tercera mayor frecuencia).Es decir, la categoría que encontramos con mayor frecuencia es obesidad de tipo I.
+
+Comparamos el peso con la altura según el nivel de obesidad
+```{r}
+train |> ggplot(mapping = aes(x = Height, y = Weight, color = NObeyesdad)) +
+  geom_point()
+```
 
 **Nivel de obesidad en función de la cantidad de comidas.**
 
@@ -145,9 +158,10 @@ Ahora representaremos los niveles de obesidad distribuidos según el peso median
 ```{r}
 train |> 
   ggplot(aes(x = NObeyesdad , y = Weight )) +  
-  geom_boxplot() 
+  geom_boxplot() +
   theme_bw() +  
-  labs(title = "Box-plot de Niveles de Obesidad por peso")  
+  labs(title = "Box-plot de Niveles de Obesidad por peso") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -158,9 +172,10 @@ Como podemos observar en el BoxPlot, los niveles de obesidad estan fuertemente r
 ```{r}
 train |> 
   ggplot(aes(x = NObeyesdad , y = Height )) +  
-  geom_boxplot() 
+  geom_boxplot() +
   theme_bw() +  
-  labs(title = "Niveles de Obesidad por altura")  
+  labs(title = "Niveles de Obesidad por altura")  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 Aunque algunas categoría presentan distribuciones más amplias no parece haber una diferencia muy grande entre la altura y los niveles de obesidad. Existen valores atípicos en las categorías Obesidad tipo ll (Obesity II ) y Sobrepeso tipo ll (Overweight ll), lo que significa que hay personas con alturas significativamente mas pequeñas a la mayoria de su grupo en el caso de Obesidad tipo ll y también mayores para Sobrepeso tipo ll
@@ -170,9 +185,10 @@ Aunque algunas categoría presentan distribuciones más amplias no parece haber 
 ```{r}
 train |> 
   ggplot(aes(x = NObeyesdad , y = Age )) +  
-  geom_boxplot() 
+  geom_boxplot() +
   theme_bw() +  
-  labs(title = "Box-plot de Nieveles de Obesidad por edad")  
+  labs(title = "Box-plot de Nieveles de Obesidad por edad")  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 Los niveles de menor peso, Insufficient Weight y Normal Weight, tienen una mediana de edad más baja, entorno a los 20-25 años. Obesity Type l, Obesity Type ll y Obesity Type lll, tienen medianas de edad mas altas, entorno a los 25 años. Podemos observar también que Overweight Level ll tiene una variabilidad mayor en la edad. Encontramos valores atípicos que sobrepasan en la mayoría de categorías. De manera clara podemos concluir que las personas con menor peso tienden a ser más jóvenes, y las personas con un nivel de obesidad mayor tienen una media de edad más alta.
@@ -274,7 +290,8 @@ table(train$CAEC)
 train |> 
   ggplot(aes(x = NObeyesdad, fill = CAEC)) +
   geom_bar(position = position_dodge()) +
-  theme_bw()
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 Ahora agrupamos la categoria Mtrans (que asigna el medio de transporte que usan las personas de la muestra) en los que van andando y los que van en transporte, para ver como afecta el movimiento a la obesidad.
@@ -300,8 +317,8 @@ ggplot(filter(obesidad_transp, MTRANS_grouped == "No Walking"), aes(x = NObeyesd
   geom_bar(position = "dodge") +  # Barras separadas
   labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas que NO caminan") +
-  theme_minimal()
-
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -313,9 +330,8 @@ ggplot(filter(obesidad_transp, MTRANS_grouped == "Walking"), aes(x = NObeyesdad,
   geom_bar(position = "dodge") +  # Barras separadas
   labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas que caminan") +
-  theme_minimal()
-
-
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -327,7 +343,8 @@ ggplot(filter(obesidad_transp, family_history_with_overweight == "yes"), aes(x =
   geom_bar(position = "dodge") +  # Barras separadas
   labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas con Historial familiar de Sobrepeso") +
-  theme_minimal()
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 ```
 
@@ -337,8 +354,8 @@ ggplot(filter(obesidad_transp, family_history_with_overweight == "no"), aes(x = 
   geom_bar(position = "dodge") +  # Barras separadas
   labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas sin Historial familiar de Sobrepeso") +
-  theme_minimal()
-
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 El primer gráfico muestra los niveles de obesidad en personas con un historial familiar de obesidad, tal y como se puede observar, cuanto mayor es el nivel de obesidad, mas personas hay con familiares con obesidad. Ya que, las categorías "peso insuficiente" y "peso normal" son las que menos gente con este historial tienen, en las categorias de sobrepeso (Overweight) el número de personas con familiares con obesidad aumenta y ya por último en las de los tres tipos de obesidad, el número de mucho mayor.
@@ -346,10 +363,3 @@ El primer gráfico muestra los niveles de obesidad en personas con un historial 
 En el segundo gráfico se muestra la otra categoria, pesonas sin historial familiar de sobrepeso. En este caso ocurre lo contrario, cuanto menor es el nivel de obesidad, mayor es la frecuencia con la no existe un historial familiar de sobrepeso. Cabe destacar que en los niveles de Obesidad 1 y 2, la frecuencia es casi nula y en el nivel de Obesidad 3 no hay frecuencia, por lo que no hay nadie con ese nivel de obesidad, que es el más alto, que no tenga un historial familiar de obesidad.
 
 Por tanto, podemos concluir que tener un historial familiar de obesidad afecta directamente al nivel de obesidad de la persona, ya sea por genética o por el estilo de vida.
-
-Antes de nada vamos a mirar como se puede ver nuetra variable objetivo, que sería el nivel de obesidad que hay en esta muestra, primero vamos a ver información sobre la variable
-
-```{r}
-summary(train$NObeyesdad)
-table(train$NObeyesdad)
-```
