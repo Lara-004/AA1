@@ -506,6 +506,33 @@ ironman_lake_placid_female_2022[ironman_lake_placid_female_2022$Bib == "101", c(
 
 Esta vez, los tiempos de esta atleta están muy por encima de la media, por lo que podemos concluir que efectivamente las atletas mas lentas, y por tanto con tiempos mayores, se encuentran mas a la derecha.
 
+Ahora, lo representamos por colores según si ha superado la media en todas las categorías, si no ha superado la media en ninguna y si lo ha superado en algunas si y en otras no, y como podemos observar en el siguiente gráfico coincide con nuestras conclusiones anteriores:
+
+```{r}
+# Calcular el PCA
+pca_result <- prcomp(ironman_numeric, scale = TRUE)
+
+# Medias de cada disciplina
+media_swim <- 88.1032
+media_bike <- 424.7561
+media_run  <- 324.5799
+
+swim_times <- ironman_lake_placid_female_2022$Swim.Time
+bike_times <- ironman_lake_placid_female_2022$Bike.Time
+run_times  <- ironman_lake_placid_female_2022$Run.Time
+
+colores <- ifelse(swim_times < media_swim & bike_times < media_bike & run_times < media_run, "blue", 
+           ifelse(swim_times > media_swim & bike_times > media_bike & run_times > media_run, "red",    
+                  "green")) 
+plot(-pca_result$x[, 1:2], col = colores, pch = 16, 
+     xlab = "PC1", ylab = "PC2", main = "PCA según tiempos en Swim, Bike y Run")
+
+# Agregar una leyenda para interpretar los colores
+legend("topright", legend = c("Más rápida en todo", "Mixta", "Más lenta en todo"), 
+       col = c("blue", "green", "red"), pch = 16)
+
+
+```
 ```{r}
 biplot(prcomp(ironman_numeric,scale=T)) 
 ```
