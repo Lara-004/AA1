@@ -369,9 +369,9 @@ En el segundo gráfico se muestra la otra categoria, pesonas sin historial famil
 
 Por tanto, podemos concluir que tener un historial familiar de obesidad afecta directamente al nivel de obesidad de la persona, ya sea por genética o por el estilo de vida.
 
-# PCA
+# **PCA**
 
-## CON LA FUNCIÓN PRCOMP EN R:
+## Con la función prcomp() de R:
 
 ```{r}
 library(readr)
@@ -406,23 +406,42 @@ ironman_numeric <- ironman_lake_placid_female_2022[, c("Swim.Time", "Bike.Time",
 ```{r}
 #Eliminamos filas con valores NA
 ironman_numeric <- na.omit(ironman_numeric)
+
 # Verificamos si hay valores NA
 sum(is.na(ironman_numeric))
+
 #Verificamos que no haya varianza cero en las columnas
 ironman_numeric <- ironman_numeric[, sapply(ironman_numeric, function(col) var(col, na.rm = TRUE) > 0)]
 ```
 
-Realizamos el análisis de componentes principales (PCA) que se basa en simplificar la estructura de datos, preservando al mismo tiempo la mayor cantidad posible de información. Este método convierte un grupo de variables originales en un conjunto nuevo de variables no correlacionadas llamadas componentes principales. Estas nuevas variables capturan la variabilidad presente en los datos de manera más eficiente. Con la función prcomp realizamos el PCA:
+Realizamos el análisis de componentes principales (PCA) que se basa en simplificar la estructura de datos, preservando al mismo tiempo la mayor cantidad posible de información. Este método convierte un grupo de variables originales en un conjunto nuevo de variables no correlacionadas llamadas componentes principales. Estas nuevas variables capturan la variabilidad presente en los datos de manera más eficiente.
+
+Con la función prcomp realizamos el PCA:
 
 ```{r}
 # Aplicar PCA con escalado
 pca_result <- prcomp(ironman_numeric, scale. = TRUE)
 ```
 
+```{r}
+dim(pca_result$x)
+```
+
+Nuestro PCA nos da un total de 3 componentes principales (PC1, PC2 Y PC3) y 489 atletas
+
 Visualizamos la importancia relativa de cada componente:
 
 ```{r}
-plot(prcomp(ironman_numeric,scale=T))
+pca_result <- prcomp(ironman_numeric, scale=T)
+
+# Graficamos el PCA para observar la varianza que explica cada componente
+plot(pca_result, col = c("coral", "brown", "pink"), 
+     main = "Varianza Explicada por Componentes", 
+     xlab = "Componentes Principales")
+
+
+axis(1, at=1:3, labels=c("PC1", "PC2", "PC3"))
+
 ```
 
 ```{r}
@@ -432,20 +451,35 @@ summary(prcomp(ironman_numeric,scale=T))
 Como podemos observar, la variabilidad de los datos la explica principalmente la componente principal PC1, ya que en el gráfico de barras es significativamente más alta que las demás. Además en la matriz Rotation PC1 explica el 56,71% de la varianza total. La segunda componente más influyente es PC2, que explica un 33,26%, con las dos primeras variables explicamos el 90% de la variabilidad. A la segunda componente principal la sigue PC3 con un 10%, por lo que esta última es la menos explicativa.
 
 ```{r}
-prcomp(ironman_numeric,scale=T)
+#Desviaciones típicas de los autovalores
+prcomp(ironman_numeric, scale=T)$sdev
+#cantidad de variabilidad explicada por cada componente principal
 ```
 
-PC1 asigna pesos a las variables y al tener todos el mismo signo, significa que hace un promedio ponderado de las variables principales.
+Las desviaciones típicas explican también la cantidad de variabilidad explicada por cada componente principal y PC1 es la mayor y por tanto las que más explica.
+
+Por tanto, las dos primeras componentes principales PC1 Y PC2, son suficientemente representativas como para realizar un gráfico de los datos con ellas, ya que explican la mayor parte de la varianza.
+
+Continuamos representando la matriz de rotacion, cuyos valores muestran cuanto contribuye cada variable original a cada componente principal:
 
 ```{r}
-plot(prcomp(ironman_numeric,scale=T)$x[,1:2])
-#No entiendo porque ahora me salen los números así ordenados y abajo al reves
+# Rotation representa la matriz de rotacion
+prcomp(ironman_numeric, scale=T)$rotation
+```
+
+PC1 asigna pesos a las variables y como se ve en la matriz todas tienen un peso con el mismo signo lo que significa que hace un promedio ponderado de las variables principales.
+
+```{r}
+plot(prcomp(ironman_numeric,scale=T)$x[,1:2], col = adjustcolor("cyan3"))
 ```
 
 Representamos los datos en las dos primeras componentes principales, PC1 Y PC2. La mayoría de los datos están agrupados entorno al valor 0 de la segunda componente principal, por lo que parece que las diferencias entre los datos en la dimensión capturada por PC2 no son muy grandes. Sin embargo, nos encontramos con un valor excepcional el cual se encuentra por debajo del valor -20 de PC2, lo que sugiere que puede tratarse de un atleta con características númericas diferentes en algunas de las variables consideradas. Para analizarlo, vamos a representar los datos con el nombre de cada atleta:
 
 ```{r}
+#Hacemos que ironman_numeric sea un dataframe para poder poner los nombres 
+ironman_numeric <- as.data.frame(ironman_numeric)  
 rownames(ironman_numeric) <- ironman_lake_placid_female_2022$Name
+
 plot(prcomp(ironman_numeric,scale=T)$x[,1:2], type='n')
 text(prcomp(ironman_numeric,scale=T)$x[,1:2],labels=rownames(ironman_numeric))
 ```
@@ -467,10 +501,10 @@ Comparándolo con la media de las columnas, la media del valor de Swim.time es 8
 ```{r}
 # Eliminar la fila 183 
 ironman_numeric <- ironman_numeric[-183, ] 
-plot(-prcomp(ironman_numeric,scale=T)$x[,1:2])
+plot(-prcomp(ironman_numeric, scale=T)$x[,1:2], col = adjustcolor("cyan3"))
 ```
 
-Podemos observar una tendencia a la agrupación en la zona central, por lo que interpretamos que la mayoría de atletas tienen un rendimiento similar entre ellas. Sin embargo, también hay ciertos puntos más alejados de la zona central y por tanto más lejos del resto. Esto nos sugiere que hay atletas con un rendimiento diferenciable, pero gin valores extremadamente alejados como era el caso de Dominique Charron. No podemos observar una separación clara en distintos grupos, pero los valores más cercanos entre ellos tendrán un rendimiento similar.
+Podemos observar una tendencia a la agrupación en la zona central, por lo que interpretamos que la mayoría de atletas tienen un rendimiento similar entre ellas. Sin embargo, también hay ciertos puntos más alejados de la zona central y por tanto más lejos del resto. Esto nos sugiere que hay atletas con un rendimiento diferenciable, pero sin valores extremadamente alejados como era el caso de Dominique Charron. No podemos observar una separación clara en distintos grupos, pero los valores más cercanos entre ellos tendrán un rendimiento similar.
 
 Además, tal y como hemos visto en la matriz de rotación, como todas las variables originales, (Bike Time, Swim Time y Run Time) tienen pesos negativos en PC1, cuanto mas a la izquierda en el eje x, que es el correspondiente a PC1, mayor es su tiempo en las disciplinas. Por lo tanto, los valores mas a la izquierda corresponden a atletas mas lentos, veamos cuales son los más destacados:
 
@@ -478,7 +512,7 @@ Además, tal y como hemos visto en la matriz de rotación, como todas las variab
 ironman_lake_placid_female_2022 <- ironman_lake_placid_female_2022[-183, ] 
 rownames(ironman_numeric) <- ironman_lake_placid_female_2022$Bib
 plot(-prcomp(ironman_numeric, scale=T)$x[,1:2],type="n")
-text(-prcomp(ironman_numeric,scale=T)$x[,1], -prcomp(ironman_numeric, scale=T)$x[,2],rownames(ironman_numeric))
+text(-prcomp(ironman_numeric,scale=T)$x[,1], -prcomp(ironman_numeric, scale=T)$x[,2],rownames(ironman_numeric), col = adjustcolor("cyan3"))
 ```
 
 Los datos que más a la derecha se encuentran y por tanto deberían ser las atletas más rápidas son los números 3 y 5, vamos a analizar los tiempos de estas atletas en cada una de las disciplinas y ver si efectivamente coincide que sean más rápidas:
@@ -495,9 +529,8 @@ ironman_lake_placid_female_2022[ironman_lake_placid_female_2022$Bib == "5", c("N
 
 Media de los tiempos de todas las atletas en cada disciplina:
 
-```         
- Run.Time Bike.Time Swim.Time 
- 324.5799  424.7561   88.1032
+```{r}
+pca_result$center
 ```
 
 Efectivamente, si lo comparamos con la media de todas las corredoras, Sarah True (3) y Rachel Zilinskas (5) tienen tiempos muy por debajo de la media en las tres disciplinas.
@@ -526,66 +559,52 @@ swim_times <- ironman_lake_placid_female_2022$Swim.Time
 bike_times <- ironman_lake_placid_female_2022$Bike.Time
 run_times  <- ironman_lake_placid_female_2022$Run.Time
 
-colores <- ifelse(swim_times < media_swim & bike_times < media_bike & run_times < media_run, "blue", 
-           ifelse(swim_times > media_swim & bike_times > media_bike & run_times > media_run, "red",    
-                  "green")) 
+colores <- ifelse(swim_times < media_swim & bike_times < media_bike & run_times < media_run, "slateblue3", 
+           ifelse(swim_times > media_swim & bike_times > media_bike & run_times > media_run, "indianred2",    
+                  "seagreen3")) 
 plot(-pca_result$x[, 1:2], col = colores, pch = 16, 
      xlab = "PC1", ylab = "PC2", main = "PCA según tiempos en Swim, Bike y Run")
 
 # Agregar una leyenda para interpretar los colores
 legend("topright", legend = c("Más rápida en todo", "Mixta", "Más lenta en todo"), 
-       col = c("blue", "green", "red"), pch = 16)
+       col = c("slateblue3", "seagreen3", "indianred2"), pch = 16)
 
 
 ```
+
+Realizamos un biplot para ver información sobre las variables principales:
+
 ```{r}
 biplot(prcomp(ironman_numeric,scale=T)) 
 ```
 
-La variable PC1 ahora muestra valores negativos a la izquierda y positivos a la derecha, con los tiempos de natación, ciclismo y carrera apuntando hacia valores positivos de PC1. Esto indica que los atletas con tiempos más altos en estas disciplinas se encuentran en la parte derecha del gráfico, mientras que los más rápidos (con tiempos menores) están a la izquierda. Además, el dorsal **3**, que representa a una corredora rápida, ahora aparece correctamente en el lado izquierdo del gráfico, alineándose con la expectativa de que tiempos más cortos correspondan a valores más bajos en PC1.
+La variable PC1 ahora muestra valores negativos a la izquierda y positivos a la derecha, con los tiempos de natación, ciclismo y carrera apuntando hacia valores positivos de PC1. Esto indica que los atletas con tiempos más altos en estas disciplinas se encuentran en la parte derecha del gráfico, mientras que los más rápidos (con tiempos menores) están a la izquierda. Además la corredora Sarah True, que como hemos observado anteriormente es corredora rápida, ahora aparece correctamente en el lado izquierdo del gráfico, lo que cofirma la idea de que tiempos más cortos correspondan a valores más bajos en PC1.
 
 Los vectores de Swim.Time, Bike.Time y Run.Time muestran cómo se relacionan las variables originales con los componentes principales e indican la dirección en la que crecen los valores de cada variable.
 
 Los vectores apuntan hacia la derecha, lo que sugiere que valores más altos en estas variables están asociados con valores más altos en PC1. Los tres vectores están relativamente alineados, lo que significa que las tres variables están correlacionadas: una atleta con un tiempo alto en natación probablemente también tenga tiempos altos en ciclismo y carrera.
 
-```{r}
-#desviaciones típicas de los autovalores
-pca_result$sdev
-```
+Nuestros datos proyectados en el nuevo espacio PCA son:
 
 ```{r}
-#Rotation
-prcomp(ironman_numeric, scale=T)$rotation
+pca_result <- prcomp(ironman_numeric, center = TRUE, scale. = FALSE)
+print(head(pca_result$x))
 ```
 
-```{r}
-pca_result$center
-```
-
-```{r}
-pca_result$scale
-```
-
-```{r}
-#pca_result$x
-```
-
-```{r}
-dim(pca_result$x)
-```
+Cada fila es una atleta y cada columna (PC1, PC2 Y PC3) una variable del PCA que son combinaciones lineales de las variables originales. Además, un valor más alto o más bajo en PC1 indica que indica que ese atleta está más alejado del promedio en términos de la variabilidad capturada por ese componente.
 
 ## Sin usar ninguna función de R específicamente definida para obtener las componentes principales:
 
-**MATRIZ DE COVARIANZA**: El primer paso para realizar un análisis PCA, es calcular la matriz de covarianza.
+**Matriz de covarianza**: El primer paso para realizar un análisis PCA, es calcular la matriz de covarianza.
 
 ```{r}
 #Seleccionamos solo las variables necesarias para hacer el PCA, que son Swim.Time, Bike.Time y Run.Time
-ironman_numeric <- ironman_lake_placid_female_2022[, c("Swim.Time", "Bike.Time", "Run.Time")]
-cov_matrix <- cov(ironman_numeric)
+ironman_numeric2 <- ironman_lake_placid_female_2022[, c("Swim.Time", "Bike.Time", "Run.Time")]
+cov_matrix <- cov(ironman_numeric2)
 cov_matrix
 ```
 
-**COMPONENTES PRINCIPALES:** El siguiente paso es calcular los autovalores y autovectores usando la matriz de covarianza:
+**Componentes principales:** El siguiente paso es calcular los autovalores y autovectores usando la matriz de covarianza:
 
 ```{r}
 #Usamos la función eigen para sacar la descomposición
@@ -617,11 +636,86 @@ Calcularemos la varianza explicada por cada componente principal diviendo cada a
 ```{r}
 varianza_explicada <- autovalores / sum(autovalores)
 varianza_explicada
+
 ```
+
+La varianza explicada nos muestra el porcentaje de varianza que explica cada componente. Por tanto, la primera componente explica el 83,78% de la varianza, el segundo componente PC2 explica un 14,67% de la varianza y PC3 un 1,5%. Esto ya nos indica que la primera componente principal explica la mayor parte de la varianza y junto con la segunda, ya suman practicamente toda, para verlo aun mas claro, usaremos la varianza acumulada:
 
 ```{r}
 varianza_acumulada <- cumsum(varianza_explicada)
 varianza_acumulada
+```
+
+Esto es simplemente la suma acumulada de la varianza explicada y efectivamente, las dos primeras componentes principales explican un 98,45% de la varianza.
+
+```{r}
+colores <- c("coral", "brown", "pink")
+
+plot(varianza_acumulada, type="b", xlab="Número de Componentes", 
+     ylab="Varianza Acumulada", main="Varianza Acumulada",
+     pch=19, col=colores, cex=1.2)
+
+legend("bottomright", legend=paste("PC", 1:length(varianza_acumulada)), 
+       col=colores, pch=19, title="Componentes Principales")
+```
+
+Usando este gráfico que representa la varianza acumulada por cada componente (que son los puntos) observamos como el primer punto (PC1), explica ya casi un 85% y con el segundo llegan casi a explicar toda la varianza. Si nos fijamos el codo del gráfico (punto donde la pendiente cambia bruscamente) es PC2, por lo que a partir de ahí la siguiente componente no aporta mucha información.
+
+Por tanto, seleccionamos las dos primeras componentes principales, PC1 y PC2, que capturan una cantidad muy significativa de la varianza total.
+
+**Transformación de datos:**
+
+Nuestras variables originales se transforman en un nuevo conjunto de variables, que son las componentes principales, son ortogonales entre sí por lo que no están correlacionadas y capturan la máxima varianza posible de los datos.
+
+Los datos proyectados en el nuevo espacio:
+
+```{r}
+#Aquí centramos los datos restando la media de cada variable
+datos_centrados <- scale(ironman_numeric2, center = TRUE, scale = FALSE)
+
+#Multiplicamos la matriz centrada por la matriz de autovectores
+datos_pca <- datos_centrados %*% autovectores
+
+# Mostrar los primeros valores transformados
+print("Datos proyectados en el nuevo espacio PCA:")
+print(head(datos_pca))
+
+```
+
+Cada columna es una componente principal y cada fila es una observación, esto es lo equivalente a la operación **(pca_result\$x)** con prcomp() que hemos realizado en el apartado anterior:
+
+```{r}
+pca_result <- prcomp(ironman_numeric, center = TRUE, scale. = FALSE)
+print(head(pca_result$x))
+```
+
+Ambos representan la proyección de los datos en el nuevo espacio y el resultado es el mismo. La única diferencia son los signos de PC1 Y PC2, que son contrarios en la primera y segunda representación, pero esto se debe a que los autovectores pueden tener la dirección invertida sin alterar la varianza explicada ni la relación entre los datos.
+
+Si representamos los datos proyectados en el espacio de PC1 Y PC2 obtenemos:
+
+```{r}
+plot(datos_pca[,1:2], xlab="PC1", ylab="PC2", 
+     main="Datos proyectados en el espacio de los componentes principales", col = adjustcolor("cyan3"))
+```
+
+Comparándolo con la representación de hecha con prcomp():
+
+```{r}
+# Eliminar la fila 183 
+ironman_numeric <- ironman_numeric[-183, ] 
+plot(-prcomp(ironman_numeric, scale=T)$x[,1:2], col = adjustcolor("cyan3"))
+```
+
+Las principales diferencias entre las representaciones son dos, la escala de los ejes que se debe a la funcion scale = T de la función prcomp() que ha normalizado las variables antes de calcular el PCA. La otra diferencia es la distribución de los puntos, pero a pesar de no ser iguales están distribuidos de manera similar, esto también puede deberse a la diferencia en el escalado, veamos que ocurre si lo representamos con prcomp() pero sin scale=T:
+
+```{r}
+# Eliminar la fila 183 
+ironman_numeric <- ironman_numeric[-183, ] 
+plot(-prcomp(ironman_numeric)$x[,1:2], col = adjustcolor("cyan3"))
+```
+
+Representándolo de esta manera la distribución es exactamente igual que la que hemos obtenido programando a mano. Por tanto, las conclusiones obtenidas del PCA son las mismas ya que hemos llegado al mismo resultado.
+
 ```
 
 #Clustering
