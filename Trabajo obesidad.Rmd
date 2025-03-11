@@ -1004,7 +1004,7 @@ dist <- as.matrix(daisy(train, metric = "gower"))
 ```
 
 
-# Comprobar si cumple las condiciones para ser una métrica o una medida de desemejanza
+## Comprobar si cumple las condiciones para ser una métrica o una medida de desemejanza
 
 Primero vamos a ver cuales son las condiciones para que sea una métrica:
 
@@ -1138,9 +1138,9 @@ fviz_cluster(k2, data = M_dist, geom = "point")
 ```
 
 ```{r}
-res_kmeans$withinss
-res_kmeans$totss
-res_kmeans$betweenss
+k2$withinss
+k2$totss
+k2$betweenss
 ```
 
 - Suma de cuadrados dentro del cluster (withinss): para el primer cluster nos da 7.38 y el segundo 9.99, lo que nos dice que son homogéneos.
@@ -1178,7 +1178,7 @@ Dado que el coeficiente más cercano a 1 es el método Ward con un 0.9913, para 
 M_dist <- as.dist(as.matrix(M_dist))
 
 # Aplicar MDS para convertir en formato euclidiano
-hc1 <- cmdscale(M_dist_euc, k = 2)
+hc1 <- cmdscale(M_dist, k = 2)
 
 # Realizar clustering jerárquico con método Ward
 hc1 <- hclust(M_dist, method = "ward.D2")
@@ -1203,7 +1203,7 @@ A continuación, vamos a explicar los grupos visualizando la media de cada grupo
 
 ```{r}
 # Agregamos los clusters al dataframe original
-train$Cluster <- as.factor(res_kmeans$cluster)
+train$Cluster <- as.factor(k2$cluster)
 
 # Hacemos la media de cada variable por cluster
 cluster_means <- train %>%
