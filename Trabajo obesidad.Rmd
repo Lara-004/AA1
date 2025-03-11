@@ -830,7 +830,7 @@ El método de las k-medias es de los algoritmos de Machine Learning más utiliza
 Antes de empezar a hacer las k-medias, dado que es un algoritmo que solo admite valores tipo numéricos, vamos a crear una nueva variable para que solo tenga como columnas variables de tipo numérico y vamos a escalarlo.
 
 ```{r}
-train_num <- train %>% select(Age, Height, Weight, FCVC, NCP, CH2O, FAF, TUE)
+train_num <- train %>% dplyr::select(Age, Height, Weight, FCVC, NCP, CH2O, FAF, TUE)
 train_esc <- scale (train_num)
 ```
 
