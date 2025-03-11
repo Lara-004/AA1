@@ -1,8 +1,13 @@
 ---
 title: "Obesidad"
 author: "Marcos López García, Carmen Liberal Jiménez y Lara Montero del Prado"
-date: "2025-01-31"
-output: html_document
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    toc: yes
+    toc_float:
+      collapsed: true
 ---
 
 ```{r setup, include=FALSE}
@@ -1247,3 +1252,10 @@ En relación al transporte y la movilidad, se ha comprobado que personas que usa
 - Aprendizaje no supervisado y clustering: A través de métodos jerárquicos y no jerárquicos, se ha conseguido identificar 2 perfiles (clusters) diferenciados en los datos, diferenciados en función de la edad y el peso
 
 En definitiva, este estudio resalta la importancia de llevar un estilo de vida saludable, evidenciando que una alimentación equilibrada, la actividad física regular y la reducción del sedentarismo son elementos fundamentales para prevenir y controlar la obesidad.
+
+Partes de la práctica realizada por cada miembro del grupo:
+- 1. Comprensión del problema: Marcos López García
+- 2. EDA: Marcos López García y Carmen Liberal Jiménez
+- 3. PCA: Carmen Liberal Jiménez
+- 4. Matriz de distancias: Marcos López García. Condiciones de métrica y clustering: Lara Montero del Prado
+- 5. Conclusión: Lara Montero del Prado
