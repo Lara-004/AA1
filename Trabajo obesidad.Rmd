@@ -1,6 +1,6 @@
 ---
 title: "Obesidad"
-author: "Marcos López García"
+author: "Marcos López García, Carmen Liberal Jiménez y Lara Montero del Prado"
 date: "2025-01-31"
 output: html_document
 ---
