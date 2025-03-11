@@ -19,6 +19,7 @@ library (factoextra)
 library (NbClust)
 library (parameters)
 library (stats)
+library(summarytools)
 ```
 
 # Introducción
@@ -239,6 +240,7 @@ Comparamos el peso con la altura según el nivel de obesidad
 train |> ggplot(mapping = aes(x = Height, y = Weight, color = NObeyesdad)) +
   geom_point()
 ```
+Hay una clara tendencia positiva, a mayor altura, mayor peso. Los diferentes niveles de obesidad se distribuyen de forma ascendente, con el peso aumentando progresivamente, lo que nos confirma que el peso es clave para clasificar el nivel de obesidad.
 
 **Nivel de obesidad en función de la cantidad de comidas.**
 
@@ -464,7 +466,7 @@ El primer gráfico muestra los niveles de obesidad en personas con un historial 
 
 En el segundo gráfico se muestra la otra categoria, pesonas sin historial familiar de sobrepeso. En este caso ocurre lo contrario, cuanto menor es el nivel de obesidad, mayor es la frecuencia con la no existe un historial familiar de sobrepeso. Cabe destacar que en los niveles de Obesidad 1 y 2, la frecuencia es casi nula y en el nivel de Obesidad 3 no hay frecuencia, por lo que no hay nadie con ese nivel de obesidad, que es el más alto, que no tenga un historial familiar de obesidad.
 
-Por tanto, podemos concluir que tener un historial familiar de obesidad afecta directamente al nivel de obesidad de la persona, ya sea por genética o por el estilo de vida.
+Por tanto, podemos concluir que tener un historial familiar de obesidad afecta directamente al nivel de obesidad de la persona, ya sea por genética o por el estilo de vida. Lo mismo pasa con el consumo frecuente de calorias, la edad (las personas más jóvenes pesan menos), o el medio de transporte utlizado (si implica movimiento el nivel de obesidad es menor). Además, hacer solo una comida al día te hace ser menos propenso a padecer de algún tipo de obesidad aunque hacer las tres comidas del día no esta directamente relacionado con no padecer obesidad, al igual que fumar tampoco lo está.
 
 # **PCA**
 
@@ -812,6 +814,8 @@ plot(-prcomp(ironman_numeric)$x[,1:2], col = adjustcolor("cyan3"))
 ```
 
 Representándolo de esta manera la distribución es exactamente igual que la que hemos obtenido programando a mano. Por tanto, las conclusiones obtenidas del PCA son las mismas ya que hemos llegado al mismo resultado.
+
+El PCA nos ha permitido reducir la dimensión de los datos de rendimiento en el Ironman, transformando las variables originales en componentes explicativas, de las cuales PC1 Y PC2 han sido suficientemente explicativas. Por su parte, PC1 ha explicado la mayor parte de la variabilidad, indicandonos que los tiempos de nadar, correr y bicicleta están correlacionados.
 
 ```
 
