@@ -987,9 +987,14 @@ El PCA nos ha permitido reducir la dimensión de los datos de rendimiento en el 
 
 ## Matriz de distacias o semejanzas.
 
-Vamos a hacer la matriz de distacia de gower ya que tenemos variables de tipo caracter y de tipo numérico.para estos datos, vamos a cambiar las variables que son de tipo cadena de caracteres a factores.
+Vamos a diseñar una matriz de distancias según las características de nuestros datos.
+
+En el EDA ya hemos visto como tenemos tanto datos numéricos como datos categóricos. Es por eso que calcular una matriz de distancias euclidiana no es buena idea ya que se necesitan datos numéricos y apenas la mitad de nuestros datos lo son, por lo que la mejor matriz de distancias que se ajusta más a nuestros datos, dado que tenemos tanto de tipo categóricas y continuas, es hacer la **matriz de distancias de Gower**.
+
+Antes de crear la matriz vamos a transformar las variables de tipo cadena de caracteres a factor para evitar posibles errores.
 
 ```{r}
+library(corrplot)
 # Cambiar variables de tipo cadena de caracteres a factor.
 train <- train |> 
   mutate(across(where(is.character), as.factor))
@@ -997,6 +1002,83 @@ train <- train |>
 # Matriz de distancias.
 dist <- as.matrix(daisy(train, metric = "gower"))
 ```
+
+
+# Comprobar si cumple las condiciones para ser una métrica o una medida de desemejanza
+
+Primero vamos a ver cuales son las condiciones para que sea una métrica:
+
+La medida de desemejanza entre dos observaciones \( x \) e \( y \) es una función \( \delta(x, y) \) que cumple las siguientes propiedades:
+
+\begin{itemize}
+    \item \textbf{Coincidencia:} 
+    \[
+    \delta(x, y) = 0 \iff x = y
+    \]
+    \item \textbf{No negatividad:} 
+    \[
+    \delta(x, y) \geq 0
+    \]
+    \item \textbf{Simetría:} 
+    \[
+    \delta(x, y) = \delta(y, x)
+    \]
+\end{itemize}
+
+Si, además, la función \( \delta(x, y) \) verifica la desigualdad triangular, se trataría de una distancia \textbf{\textcolor{yellow}{métrica}}:
+
+\[
+\delta(x, y) \leq \delta(x, z) + \delta(y, z)
+\]
+
+En resumen, si una función de distancia cumple estas propiedades, se considera una \textbf{métrica}. Si no cumple la desigualdad triangular pero sí las otras condiciones, se considera una \textbf{medida de desemejanza}.
+  
+
+```{r}
+# Verificar si la matriz de Gower cumple las condiciones para ser una métrica
+
+# 1. No negatividad
+no_negatividad <- all(dist >= 0)
+
+# 2. Identidad del indiscernible
+identidad_indiscernible <- all(diag(dist) == 0)
+
+# 3. Simetría
+simetria <- all(dist == t(dist))
+
+print(no_negatividad, identidad_indiscernible, simetria)
+```
+
+Ahora vamos a ver si cumple la desigualdad triangular:
+
+```{r}
+n <- nrow(dist)
+
+# Verificación de la desigualdad triangular
+desigualdad_triangular <- TRUE
+
+for (i in 1:n) {
+  for (j in 1:n) {
+    for (k in 1:n) {
+      if (dist[i, k] > dist[i, j] + dist[j, k]) {
+        desigualdad_triangular <- FALSE
+        break
+      }
+    }
+    if (!desigualdad_triangular) break
+  }
+  if (!desigualdad_triangular) break
+}
+
+# Imprimir resultado
+if (desigualdad_triangular) {
+  print("La matriz de Gower cumple la desigualdad triangular (es una métrica).")
+} else {
+  print("La matriz de Gower NO cumple la desigualdad triangular (no es una métrica).")
+}
+```
+
+Dado que las 3 primeras condiciones las cumple y la desigualdad triangular no, entonces **no es una métrica**, pero **sí es una medida de desemejanza**
 
 ## Métodos no jerarquicos
 
