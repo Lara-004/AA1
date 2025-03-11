@@ -320,7 +320,7 @@ Dado que la diferencia de personas en cada grupa es bastante diferente, vamos a 
 
 ```{r}
 
-ggplot(filter(obesidad_transp, family_history_with_overweight == "yes"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+ggplot(filter(train, family_history_with_overweight == "yes"), aes(y = NObeyesdad, fill = NObeyesdad)) +
   geom_bar(position = "dodge") +  # Barras separadas
   labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas con Historial familiar de Sobrepeso") +
@@ -329,7 +329,7 @@ ggplot(filter(obesidad_transp, family_history_with_overweight == "yes"), aes(y =
 
 ```{r}
 # Filtrar datos donde la persona NO tiene historial familiar de sobrepeso
-ggplot(filter(obesidad_transp, family_history_with_overweight == "no"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+ggplot(filter(train, family_history_with_overweight == "no"), aes(y = NObeyesdad, fill = NObeyesdad)) +
   geom_bar(position = "dodge") +  # Barras separadas
   labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas sin Historial familiar de Sobrepeso") +
