@@ -5,6 +5,10 @@ date: "2025-01-31"
 output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 ```{r echo=FALSE}
 library(readr)
 library(ggplot2)
@@ -20,9 +24,10 @@ library (NbClust)
 library (parameters)
 library (stats)
 library(summarytools)
+library(corrplot)
 ```
 
-# Introducción
+# 0. Introducción.
 
 Este conjunto de datos contienen la información para dar una estimación de los niveles de obesidad de personas residentes en Mexico, Perú y Colombia.
 
@@ -41,7 +46,7 @@ En este dataset podemos encontrar distintos tipos de variables:
 * CAEC: Consumo de alimentos entre comidas.
 * CH2O: Consumo de agua diariamente.
 * CALC: Consumo de alcohol.
-* SCC: Consumo de calorías.
+* SCC: Monitoreo del consumo de calorías.
 * FAF: Frecuencias de actividad física.
 * TUE: Tiempo utilizado dispositivos electronicos.
 * MTRANS: Transporte utilizado con frecuencia.
@@ -54,7 +59,7 @@ En este dataset podemos encontrar distintos tipos de variables:
   * Obesidad II: 35,0 a 39,9.
   * Obesidad III: Mayor de 40.
 
-# Data understanding
+# 1. Data understanding.
 
 Primero de todo, vamos a cargar los datos y vamos a ver la cantidad de variables y observaciones que encontramos.
 
@@ -72,13 +77,22 @@ str(obesidad)
 Podemos ver como hay distintos tipos de variables en los datos, en el cual solo hay dos tipos, el tipo numérico `num` (`Age`, `Height`, `Weight`, `FCVV`, `NCP`, `CH2O`, `FAF`Y `TUE`) y por otro lado, tenemos vectores de caracteres `char` (`Gender`, `family_history_with_overweight`, `FAVC`, `CAEC`, `SMOKE`, `SSC`, `CALC`, `MTRANS`, `NObeyesdad`)
 
 Antes de hacer la partición de los datos para hacer un mejor análisis, vamos a observar si hay valores faltantes.
+
 ```{r}
 colSums(is.na(obesidad))
 ```
 
-Podemos observar que no hay variables de tipo NA, por lo que no es necesario hacer algún tipo de imputación sobre los datos para hacer el análisis de los datos.
+Podemos observar que no hay variables de tipo NA, por lo que no es necesario hacer algún tipo de imputación sobre los datos para hacer el análisis de los datos. Vemos que en la variables hay ciertos valores que no tiene mucho sentido, como por ejemplo que el número de comidas principales tenga decimales y otras más, por ello vamos a corregir esoso errores.
+
+```{r}
+obesidad$Age <- round(obesidad$Age)
+obesidad$NCP <- round(obesidad$NCP)
+obesidad$FAF <- round(obesidad$FAF)
+
+```
 
 Realizamos la partición de nuestros datos.
+
 ```{r}
 set.seed(1)
 
@@ -106,13 +120,14 @@ val <- test_val[indices.val, ]
 ```
 
 Miramos la información de nuestros datos de entrenamiento
+
 ```{r}
 dim(train)
 head(train)
 str(train)
 ```
 
-# EDA
+# 2. EDA.
 Vamos a comenzar con nuestro Análisis Exploratorio de Datos, que ayudará a comprender la estructura, distribución y relaciones de nuestras variables con los niveles de obesidad.
 
 Mediante una tabla de frecuencias, vamos a observar como se distribuye cada tipo de obesidad en nuestros datos
@@ -128,7 +143,19 @@ knitr::kable(tabla_frecuencias, digits = 4)
 
 ```
 
-A continuación, mostramos histogramas de todas las variables continuas, aunque mas adelante analizaremos más detalladamente algunos de ellos.
+Ahora vamos a hechar un vistazo a la distribución de nuestra variable objetivo.
+
+```{r}
+train |> 
+  ggplot(aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar() +
+  theme_bw() + 
+  labs(title = "Tipos de obesidad", 
+       y = "Tipo de obesidad",
+       x = "Frecuencia absoluta")
+```
+
+Como se puede ver en el gráfico, la mayoría de las personas que hay en esta variable para entrenar nuestro modelo, han desarrollado obesidad de tipo I, siguiengo el peso normal y la obesidad de tipo III. A continuación, mostramos histogramas de todas las variables continuas y una matriz de correlación, aunque mas adelante analizaremos más detalladamente algunos de ellos.
 
 ```{r}
 df_continuas <- train[, sapply(train, is.numeric)]
@@ -139,8 +166,13 @@ graficas <- lapply(names(df_continuas), function(var) {
        xlab = var, ylab = "Frecuencia", col = "pink")
 })
 ```
+```{r}
+# Matriz de correlación
+cor_matrix <- cor(train %>% select_if(is.numeric))
+corrplot(cor_matrix, method = "color", type = "lower", tl.col = "black")
+```
 
-Calculando la estadísticas descriptivas de las variables númericas obtenemos un resumen numérico de las características de los datos:
+Viendo esta matriz de correlaciones, podemos ver como la edad y el tiempo que se utilizan los dispositivos electrónicos, tiene una relación inversa, es decir, que cuanta más edad menos se usan, por otro lado, la altura tiene una relación con el número de comidas principales, el peso y la frecuencia de actividad física.Calculando la estadísticas descriptivas de las variables númericas obtenemos un resumen numérico de las características de los datos:
 
 ```{r}
 #Estadísticas descriptivas de las variables númericas
@@ -159,33 +191,112 @@ train |> ggplot(aes(Weight)) +
   theme_bw()
 ```
 
-Con la tabla de frecuencias podemos observar que el conjunto de datos tiene una distribución bastante parecida entre las categorías de obesidad, con la categoría Obesity Type l siendo la más frecuente (15.72%) y Insufficient Weight la menos frecuente (12.72%). Además, en el histograma de distribución del peso se aprecia un pico alrededor de los 80 kg, por lo que podemos intuir que las personas con Obesidad Tipo l pueden tener un peso alrededor de este valor. En general, los pesos se encuentran mayoritariamente entre los 50 y 120 kg y algún valor atípico por encima de los 160 kg.
-
-Ahora vamos a analizar algunas de nuestras variables, con el siguiente histograma mostramos la distribución de edades de nuestros datos, que nos permite visualizar la cocentración:
+Con la tabla de frecuencias podemos observar que el conjunto de datos tiene una distribución bastante parecida entre las categorías de obesidad, con la categoría Obesity Type l siendo la más frecuente (15.72%) y Insufficient Weight la menos frecuente (12.72%). Además, en el histograma de distribución del peso se aprecia un pico alrededor de los 80 kg, por lo que podemos intuir que las personas con Obesidad Tipo l pueden tener un peso alrededor de este valor. En general, los pesos se encuentran mayoritariamente entre los 50 y 120 kg y algún valor atípico por encima de los 160 kg. Ahora vamos a analizar las demás variables y su relación con otras variable. Lo primero que vamos a ver es la distribución del género en este estudio.
 
 ```{r}
-train |> ggplot(aes(Age)) +
-  geom_histogram(
-    fill = "pink", 
-    bins = 15,           
-    col = "white"        
-  ) +
+train |>
+  ggplot(aes(Gender)) +
+  geom_bar(fill = "pink") +
   theme_bw()
 ```
 
-La mayoría de personas tienen entre 15 y 30 años, con un pico en los 20 años, por lo que los datos que estamos analizando son mayoritariamente de personas jóvenes. A partir de los 30 años la frecuencia disminuye con muy pocos casos por encima de los 50 años.
+Viendo el gráfico se puede ver que el número de mujeres y hombres que han participado en este estudio es bastante similar, lo que me da que pensar si el nivel de obesidad es más destacable con algún género. 
 
 ```{r}
-train |> ggplot(aes(Height)) +
-  geom_histogram(
-    fill = "pink", 
-    bins = 15,           
-    col = "white"        
-  ) +
+train |>
+  ggplot(aes(x = Gender, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
   theme_bw()
 ```
 
-Este histograma muestra la distribución de alturas en la muestra, la mayoria de personas tienen una altura entre 1.60 y 1.90 metros, con un pico alrededor de los 1.75 y 1.80 metros. Esto tiene sentido, ya que teniendo en cuenta el histograma de edad, la mayoria de personas son jóvenes cuyas alturas suelen estar alrededor de estas.
+Al mirar la relación entre el nivel de obesidad entre hombres y mujeres, podemos ver com en mujeres se da sobre todo la obesidad de tipo III, mientras que en hombres la obesidad de tipo II, lo que si que es curioro es que en mujeres apenas hay con obesidad de tipo II y en hombre no hay personas con obesidad de tipo III. A continuación vamos a ver como se distribuye la edad de las personas del estudio
+
+
+```{r}
+train |> 
+  ggplot(aes(Age)) +
+  geom_histogram(fill = "pink", col = "white", bins = 15) +
+  theme_bw()
+```
+
+Por lo que se ve en este estudio han participado personas bastante jóvenes, ya que la mayoría de personas tienen entre 15 y 30 años, con un pico en los 20 años. A partir de los 30 años la frecuencia disminuye con muy pocos casos por encima de los 50 años, por ello vamos a ver que relación hay con el nivel de obesidad.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad , y = Age )) +  
+  geom_boxplot() +
+  theme_bw() +  
+  labs(title = "Box-plot de Nieveles de Obesidad por edad")  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Los niveles de menor peso, Insufficient Weight y Normal Weight, tienen una mediana de edad más baja, entorno a los 20-25 años. Obesity Type l, Obesity Type ll y Obesity Type lll, tienen medianas de edad mas altas, entorno a los 25 años. Podemos observar también que Overweight Level ll tiene una variabilidad mayor en la edad. Encontramos valores atípicos que sobrepasan en la mayoría de categorías. De manera clara podemos concluir que las personas con menor peso tienden a ser más jóvenes, y las personas con un nivel de obesidad mayor tienen una media de edad más alta. Con estos datos más los de la matriz de correlación, vamos a ver la relación que hay entre la edad y el tiempo que se usan los dispositivos electrónicos.
+
+```{r}
+train |>
+  ggplot(aes(x = TUE, y = Age)) +
+  geom_point() +
+  theme_bw()
+```
+
+Por lo que vemos, hay una diferencia en la edad, lo que se puede ver que entre los 20 y los 30, hay más personas usando dispositivos electrónicos entre 0 y 2h, por otro lado, se ve como a partir de los 35 la gente usa menos el movil hasta los 45 que se ve que nadie lo usa.Ya vistos la edad y el género de las personas, vamos a ver la estatura de las personas.
+
+```{r}
+train |> 
+  ggplot(aes(Height)) +
+  geom_histogram(fill = "pink", bins = 15, col = "white") +
+  theme_bw()
+```
+
+Este histograma muestra la distribución de alturas en la muestra, la mayoria de personas tienen una altura entre 1.60 y 1.90 metros, con un pico alrededor de los 1.75 y 1.80 metros. Esto tiene sentido, ya que teniendo en cuenta el histograma de edad, la mayoria de personas son jóvenes cuyas alturas suelen estar alrededor de estas. Lo que nos da que pensar la relación que puede haber con el peso y con el nivel de obesidad de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = Height, y = Weight, color = NObeyesdad)) +
+  geom_point() +
+  theme_bw()
+```
+
+Como se ve hay una grán relación entre el peso, la altura y el nivel de obesidad, en la que cuanto más pesa y mide una personas, más posibilidad de desarrollar algún tipo de obesidad, como se ve, esta relación es lineal. Viendo este gráfico, vamos a representar el peso y la altura con el nivel de obesidad por separado.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad , y = Weight)) +  
+  geom_boxplot() +
+  theme_bw() +  
+  labs(title = "Box-plot de Niveles de Obesidad por peso") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Como podemos observar en el BoxPlot, los niveles de obesidad estan fuertemente relacionados con el peso. Las personas con un mayor peso son las que padecen de Obesidad tipo 3, dentro de esta categoria podemos observar un valor atípico, que se sale por encima del rango, y seria la persona con mas peso entorno a 172,5 kg. La siguiente clase con mas peso son las Obesidad tipo 2, donde también hay ciertos valores atípicos que está vez están por debajo del rango. La tercera categoria con mas peso es la Obesidad tipo 1, donde encontramos al mayor número de personas si recordamos el gráfico anterior. Por último, ordenadas de mayor a menor peso encontramos: Sobrepeso nivel 1, Sobrepeso nivel 2, Peso normal y Peso insuficiente.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad , y = Height )) +  
+  geom_boxplot() +
+  theme_bw() +  
+  labs(title = "Niveles de Obesidad por altura")  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Aunque algunas categoría presentan distribuciones más amplias no parece haber una diferencia muy grande entre la altura y los niveles de obesidad. Existen valores atípicos en las categorías Obesidad tipo ll (Obesity II ) y Sobrepeso tipo ll (Overweight ll), lo que significa que hay personas con alturas significativamente mas pequeñas a la mayoria de su grupo en el caso de Obesidad tipo ll y también mayores para Sobrepeso tipo ll. Ahora vamos a ver la relación con el número de comidas principales y con la frecuencia de actividad física.
+
+```{r}
+train |>
+  ggplot(aes(x = Height, y = TUE)) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+train |>
+  ggplot(aes(x = Height, y = FAF)) +
+  geom_point() +
+  theme_bw()
+```
+Con el gráfico de tiempo de uso de dispositovos electrónicos con la altura, no se ve ninguna relación, sin embargo, se puede ver que las personas que no hacen ejercicio miden menos que las que si que lo hacen, y que las personas que hacern ejercicio 1 día a la emana, la altura tiene mayor variabilidad que los que hacen ejercicio 2o 3 días a la semana. Con estos dos boxplots, podemos ver que se ve una relación grande entre el peso y el nivel de obesidad más que con la altura y el nivel de obesidad.
+
 
 ```{r}
 train|> 
@@ -197,172 +308,70 @@ train|>
        y = "Frecuencia absoluta")
 ```
 
-Muchas más personas tienen un historial familiar de sobrepeso de las que no lo tienen, intuitivamente podríamos decir que esto afecta directamente al nivel de obesidad de la persona asi que más adelante analizaremos esta variable en función de los niveles de obesidad para ver si la suposición es cierta.
-
-Los medios de transporte utilizados por las personas también pueden afectar al nivel de obesidad ya que pueden suponer más o menos actividad física, veremos la frecuencia de cada uno para más adelante analizarlos en función de los niveles de obesidad:
+Muchas más personas tienen un historial familiar de sobrepeso de las que no lo tienen, por eso, vamos a ver si hay alguna relación con el nivel de obesidad y con el peso de las personas del estudio.
 
 ```{r}
-train|> 
-  ggplot(aes(x = MTRANS)) +
+train |>
+  ggplot(aes(x = family_history_with_overweight, fill = NObeyesdad)) +
+  geom_bar(position = "dodge")
+```
+
+Dado que la diferencia de personas en cada grupa es bastante diferente, vamos a hacer un gráfico individual para cada tipo de historial familiar.
+
+```{r}
+
+ggplot(filter(obesidad_transp, family_history_with_overweight == "yes"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +  # Barras separadas
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
+  ggtitle("Frecuencia de NObesity en personas con Historial familiar de Sobrepeso") +
+  theme_minimal() 
+```
+
+```{r}
+# Filtrar datos donde la persona NO tiene historial familiar de sobrepeso
+ggplot(filter(obesidad_transp, family_history_with_overweight == "no"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +  # Barras separadas
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
+  ggtitle("Frecuencia de NObesity en personas sin Historial familiar de Sobrepeso") +
+  theme_minimal() 
+```
+
+El primer gráfico muestra los niveles de obesidad en personas con un historial familiar de obesidad, tal y como se puede observar, cuanto mayor es el nivel de obesidad, mas personas hay con familiares con obesidad. Ya que, las categorías "peso insuficiente" y "peso normal" son las que menos gente con este historial tienen, en las categorias de sobrepeso (Overweight) el número de personas con familiares con obesidad aumenta y ya por último en las de los tres tipos de obesidad, el número de mucho mayor.
+
+En el segundo gráfico se muestra la otra categoria, pesonas sin historial familiar de sobrepeso. En este caso ocurre lo contrario, cuanto menor es el nivel de obesidad, mayor es la frecuencia con la no existe un historial familiar de sobrepeso. Cabe destacar que en los niveles de Obesidad 1 y 2, la frecuencia es casi nula y en el nivel de Obesidad 3 no hay frecuencia, por lo que no hay nadie con ese nivel de obesidad, que es el más alto, que no tenga un historial familiar de obesidad.
+
+Por tanto, podemos concluir que tener un historial familiar de obesidad afecta directamente al nivel de obesidad de la persona, ya sea por genética o por el estilo de vida. Lo mismo pasa con el consumo frecuente de calorias, la edad (las personas más jóvenes pesan menos), o el medio de transporte utlizado (si implica movimiento el nivel de obesidad es menor). Además, hacer solo una comida al día te hace ser menos propenso a padecer de algún tipo de obesidad aunque hacer las tres comidas del día no esta directamente relacionado con no padecer obesidad, al igual que fumar tampoco lo está. Ahora vamos a ver si las personas de las que se ha hecho el estudio, consumen frecuentemente alimentos con alto valor energetico.
+
+```{r}
+train |>
+  ggplot(aes(FAVC)) +
   geom_bar(fill = "pink") +
-  theme_bw() + 
-  labs(title = "Medio de transporte usado", 
-       x = "Medio de transporte",
-       y = "Frecuencia absoluta")
+  theme_bw()
 ```
-
-Ahora, nos centraremos más en el target y en ver como se relaciona con el resto de variables de distintas formas.
-
-Antes de nada vamos a mirar como se puede ver nuetra variable objetivo, que sería el nivel de obesidad que hay en esta muestra, primero vamos a ver información sobre la variable
+Por lo que se ve muchas de las personas consumen comidas con alto valor energético, por lo que hay que ver que realción tiene eso con el nivel de obesidad.
 
 ```{r}
-summary(train$NObeyesdad)
-table(train$NObeyesdad)
+train |>
+  ggplot(aes(x = FAVC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge")
 ```
-
-Vamos a visualizar la distribución de las distintas categorías dentro de la variable objetivo NObesity, que se refiere a los distintos niveles de obesidad. Esto lo haremos mediante dos gráficos de barras, en horizontal.
+Por lo que se ve la mayoría de perosnas que consumen alimentos con un alto valor energético han desarrollado obesidad de tipo I, y la mayoría de personas que no consumen alimentos con un alto valor energético tienen un peso normal, por lo que necesitamos ver como se ve el peso según se consumen alimentos altos en calorias o no.
 
 ```{r}
-train |> 
-  ggplot(aes(x = NObeyesdad, fill = NObeyesdad)) +
-  geom_bar() +
-  theme_bw() + 
-  labs(title = "Tipos de obesidad", 
-       x = "Tipo de obesidad",
-       y = "Frecuencia absoluta") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+train |>
+  ggplot(aes(x = Weight, fill = FAVC)) +
+  geom_histogram(bins = 30) +
+  theme_bw()
 ```
+Con etos dos gráfico podemos concluir que cuento más peso una persona, desarrolla algún tipo de obesidad, por otro lado, también se puede ver como cuanto menos pesa una persona, menos comidas con bajo nivel de calorias come. Continuaremos analizando otra variable que tiene que ver con la dieta, FCVC que es la frecuencia del consumo de vegetales. Como esta variable es continua, observaremos su distribución por nivel de obesidad de dos maneras mediante un histograma y un boxplot:
 
-Tal y como se puede observar en el gráfico, la frecuencia de cada tipo de obesidad es bastante parecida. Podemos ver que la clase que muestra una menor frecuencia es la de peso insuficiente, por otro lado, la clase con una mayor frecuencia es la de Obesidad de tipo I, seguido del peso normal (segunda mayor frecuencia) y de la obesidad de tipo III (tercera mayor frecuencia).Es decir, la categoría que encontramos con mayor frecuencia es obesidad de tipo I.
-
-Comparamos el peso con la altura según el nivel de obesidad
-```{r}
-train |> ggplot(mapping = aes(x = Height, y = Weight, color = NObeyesdad)) +
-  geom_point()
-```
-Hay una clara tendencia positiva, a mayor altura, mayor peso. Los diferentes niveles de obesidad se distribuyen de forma ascendente, con el peso aumentando progresivamente, lo que nos confirma que el peso es clave para clasificar el nivel de obesidad.
-
-**Nivel de obesidad en función de la cantidad de comidas.**
-
-Primero de todo vamos a observar la relación que puede haber entre el tipo de obesidad con el número de comidas que hacen las personas al día.
 
 ```{r}
-train$FCVC = round(train$FCVC)
-
-ggplot(train, aes(x = FCVC, fill = NObeyesdad , colour = NObeyesdad)) + 
-  geom_histogram(position = "dodge", bins = 5)
+train |>
+  ggplot(aes(x = FCVC)) +
+  geom_histogram(fill = "pink", bins = 25) +
+  theme_bw()
 ```
-
-Podemos ver que las personas que hacen una comida son menos propensos de desarrollar obesidad de algún tipo. Por otro lado, hay una cosa que nos parece curiosa y es que al hacer tres comidas hay bastantes personas que han desarrollado obesidad de tipo 3 o no tienen el suficiene peso. Viendo esta tabla se puede ver que las personas hacen sobretodo 3 comidas al día.
-
-**Nivel de obesidad según el peso.**
-
-Ahora representaremos los niveles de obesidad distribuidos según el peso mediante un box plot:
-
-```{r}
-train |> 
-  ggplot(aes(x = NObeyesdad , y = Weight )) +  
-  geom_boxplot() +
-  theme_bw() +  
-  labs(title = "Box-plot de Niveles de Obesidad por peso") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-```
-
-Como podemos observar en el BoxPlot, los niveles de obesidad estan fuertemente relacionados con el peso. Las personas con un mayor peso son las que padecen de Obesidad tipo 3, dentro de esta categoria podemos observar un valor atípico, que se sale por encima del rango, y seria la persona con mas peso entorno a 172,5 kg. La siguiente clase con mas peso son las Obesidad tipo 2, donde también hay ciertos valores atípicos que está vez están por debajo del rango. La tercera categoria con mas peso es la Obesidad tipo 1, donde encontramos al mayor número de personas si recordamos el gráfico anterior. Por último, ordenadas de mayor a menor peso encontramos: Sobrepeso nivel 1, Sobrepeso nivel 2, Peso normal y Peso insuficiente.
-
-**Boxplot de los niveles de obesidad distribuidos según la altura.**
-
-```{r}
-train |> 
-  ggplot(aes(x = NObeyesdad , y = Height )) +  
-  geom_boxplot() +
-  theme_bw() +  
-  labs(title = "Niveles de Obesidad por altura")  +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-Aunque algunas categoría presentan distribuciones más amplias no parece haber una diferencia muy grande entre la altura y los niveles de obesidad. Existen valores atípicos en las categorías Obesidad tipo ll (Obesity II ) y Sobrepeso tipo ll (Overweight ll), lo que significa que hay personas con alturas significativamente mas pequeñas a la mayoria de su grupo en el caso de Obesidad tipo ll y también mayores para Sobrepeso tipo ll
-
-**Boxplot de los niveles de obesidad distribuidos según la edad.**
-
-```{r}
-train |> 
-  ggplot(aes(x = NObeyesdad , y = Age )) +  
-  geom_boxplot() +
-  theme_bw() +  
-  labs(title = "Box-plot de Nieveles de Obesidad por edad")  +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-Los niveles de menor peso, Insufficient Weight y Normal Weight, tienen una mediana de edad más baja, entorno a los 20-25 años. Obesity Type l, Obesity Type ll y Obesity Type lll, tienen medianas de edad mas altas, entorno a los 25 años. Podemos observar también que Overweight Level ll tiene una variabilidad mayor en la edad. Encontramos valores atípicos que sobrepasan en la mayoría de categorías. De manera clara podemos concluir que las personas con menor peso tienden a ser más jóvenes, y las personas con un nivel de obesidad mayor tienen una media de edad más alta.
-
-**Nivel de obesidad en función de si fuma o no**
-
-Comparamos la variable objetivo con la variable categórica fumar usando un gráfico de barras:
-
-```{r}
-table(train$SMOKE)
-
-```
-
-Como hay una gran diferencia entre el número de personas que fuman y las que no calculamos proporciones dentro de cada grupo para representar un gráfico de barras que muestra la proporción de personas que fuman y las que no dentro de cada tipo de obesidad.
-
-```{r}
-# Calcular proporciones dentro de cada grupo de SMOKE
-data_prop <- train %>%
-  group_by(SMOKE, NObeyesdad) %>%
-  summarise(count = n(), .groups = "drop") %>%
-  group_by(SMOKE) %>%
-  mutate(prop = count / sum(count) * 100)
-
-ggplot(data_prop, aes(x = NObeyesdad, y = prop, fill = SMOKE)) +
-  geom_bar(stat = "identity", position = "dodge") +  # Barras separadas para cada grupo
-  labs(x = "Nivel de Obesidad", y = "Proporción (%)", fill = "¿Fuma?",
-       title = "Proporción de Niveles de Obesidad según si Fuma o No") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-```
-
-Viendo esta tabla podemos ver que si las personas fuman no tiene una relación con el nivel de obesidad. Debido a que la mayoría de las personas que fuman se encuentran en obesidad de tipo II, sin embargo el siguiente grupo en el que las personas fuman son personas de peso normal. 
-
-Como la dieta está directamente relacionada con el peso, analizaremos como ciertas variables relacionadas con la dieta afectan al peso:
-
-La primera variables que analizaremos es la frecuencia de consumo de comidas con muchas calorias.
-
-```{r}
-table(train$FAVC)
-```
-
-De nuevo nos encontramos con una diferencia significable entre el número de personas que si consumen comidas con un alto nivel de calorias y las que no, por tanto realizaremos un gráfico de barras que muestra la proporción de personas que consumen este tipo de comidas o no dentro de cada nivel de obesidad.
-
-```{r}
-# Calculamos proporciones dentro de cada grupo de FAVC
-data_prop <- train %>%
-  group_by(FAVC, NObeyesdad) %>%
-  summarise(count = n(), .groups = "drop") %>%
-  group_by(FAVC) %>%
-  mutate(prop = count / sum(count) * 100)
-
-ggplot(data_prop, aes(x = NObeyesdad, y = prop, fill = FAVC)) +
-  geom_bar(stat = "identity", position = "dodge") +  # Barras separadas para cada grupo
-  labs(x = "Nivel de Obesidad", y = "Proporción (%)", fill = "¿Consume frecuentemente comidas 
-       con un nivel alto de calorias?",
-       title = "Proporción de Niveles de Obesidad según si toma comidas con alto nivel de calorias o no") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-```
-
-Tal y como podemos observar, a medida que el nivel de obesidad es mayor la proporción de personas que no comen este tipo de comidas disminuye, recordemos que el orden es:
-
-•Underweight •Normal •Overweight l\
-•Overweight ll •Obesity I •Obesity II •Obesity III
-
-Por tanto, podemos sacar como conclusión que el consumo de comidas con alto nivel de calorias efecta directamente al nivel de obesidad de la persona.
-
-Continuaremos analizando otra variable que tiene que ver con la dieta, FCVC que es la frecuencia del consumo de vegetales. Como esta variable es continua, observaremos su distribución por nivel de obesidad de dos maneras mediante un histograma y un boxplot:
 
 Realizaremos un histograma de cada nivel de obesidad y su disatribución del consumo de vegetales para que sea mas claro, ya que al ser varios niveles en un mismo histrograma no se ve con claridad.
 
@@ -372,8 +381,7 @@ ggplot(train, aes(x = FCVC, fill = NObeyesdad)) +
   facet_wrap(~NObeyesdad) +
   labs(x = "Frecuencia de Consumo de Vegetales", y = "Cantidad de Personas",
        title = "Distribución del Consumo de Vegetales según Nivel de Obesidad") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme_minimal()
 ```
 
 ```{r}
@@ -381,28 +389,218 @@ train |>
   ggplot(aes(x = NObeyesdad, y = FCVC)) +  
   geom_boxplot() +  
   theme_bw() +  
-  labs(title = "Consumo de vegetales por NIvel de Obesidad") 
+  labs(title = "Consumo de vegetales por NIvel de Obesidad") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-La siguiente variable será CAEC, que hace referencia a ''comer entre comidas", analizaremos
+Viendo este boxplot, puedo ver que la frecuencia de consumo de verduras, está en torno a 2
 
 ```{r}
-table(train$CAEC)
+train |>
+  ggplot(aes(x = NCP)) +
+  geom_histogram(fill = "pink", bins = 7) +
+  theme_bw()
+```
+
+Con este diagrama de barras, se puede ver com la mayoría de las personas hacen 3 comidas principales al día, por lo que nos surge la duda de si tiene alguna relación con el nivel de obesidad y con el peso.
+
+```{r}
+train |>
+  ggplot(aes(x = NCP, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+En nuestro estudio, se ve como el nivel de obesidad no tiene mucho que ver, ya qeu hay personas con peso insuficiente que hacer 4 comidas al día o que hay personas que haciendo una comida al día han desarrollado obesidad de tipo I.
+
+```{r}
+train |>
+  ggplot(aes(x = Weight, y = NCP)) +
+  geom_point() +
+  theme_bw()
+```
+
+Con estos gráficos, se puede concluir lo que ya se ha visto con el número de comidas principales que hay, y es que la mayoría de las personas hacen 3 comidas principaes al día, además de eso, se ve como donde más varía el peso de las personas es con 3 comidas al día, ya que es donde más concentración de personas hay ahí. Ahora vamos a ver el consumo de alimentos entre comidas de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = CAEC)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Vemos que muchas personas comen entre comidas esporádicamente, por ello vamos a compararlo con el nivel de obesidad.
+
+```{r}
+train |>
+  ggplot(aes(x = CAEC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+Podemos ver com las personas que consumen siempre son personas con peso normal, además de eso la mayoría de personas que consumen comidas entre horas esporádicamente han desarrollado algún tipo de obesidad, por lo que se puede concluir, según este gráfico, que las personas que consumen alimentos entre horas tienen meos posibilidades de desarrollar algún tipo de obesidad. Ahora vamos a ver si las personas fuman o no.
+
+```{r}
+train |>
+  ggplot(aes(x = SMOKE)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Por lo que se ve la mayoría de las personas no fuman, sin embargo, me gustaría ver esta variable dependiendo de si hacen ejercicio o no y del nivel de obesidad de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = SMOKE, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
 ```
 
 ```{r}
 train |> 
-  ggplot(aes(x = NObeyesdad, fill = CAEC)) +
-  geom_bar(position = position_dodge()) +
-  theme_bw() +
+  ggplot(aes(x = SMOKE, y = FAF)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Freciemcoa de actividad física por si fuma o no")
+```
+
+Podemos ver que las personas que no fuman, hacen actividad física muchas más veces a la semana que los que si fuman sin embargo, tenemos un valor atípico que fuma y hacer ejercicio 3 días a la semana. Por otro lado, se ve como el fumar o no, no está muy relacionado con el nivel de obesidad que desarrollan las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = CH2O)) +
+  geom_histogram(fill = "pink", bins = 30) +
+  theme_bw()
+```
+
+Viendo el consumo de agua que tiene las personas, se ve como la mayoría de ellas consumen 2L al día, por lo que me pregunto la relación que tiene con la actividad física y con el nivel de obesidad.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad, y = CH2O)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Nivel de obesidad por consumo de agua al día") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Se puede ver como la media está en 2L por los niveles de obesidad, cosa que no nos sorprenda, ya que en la distribución del agua, la mayoría bebia 2L, sin embargo se puede ver que las personas que desarrollan un nivel de obesidad, la mayoría, beben como mínimo 1.5L mientras que las personas con peso insuficient o peso normal, beben por lo menos 1L.
+
+```{r}
+train |> 
+  ggplot(aes(x = FAF, y = CH2O)) +  
+  geom_point() +  
+  theme_bw() 
+```
+
+En las personas que entrenan 0, 1 o 2 días a la semana se ven datos que no me sorprenden por la cantidad de personas que hay en cada uno, sin embargo, las personas que entrenana 3 días a la semana benben como mínimo 2 L al día, por otro lado hay valores atípicos, como una persona que entrena 3 días y bebe 1L. A continuación vamos a ver si las personas se cuentan las calorias que consumen o no.
+
+```{r}
+train |>
+  ggplot(aes(x = SCC)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Por lo que se ve la mayoría de las personas de las que se ha hecho el estudio no se cuentan las calorías que consumen, por lo que vamos a ver si esto tiene relación con el nivel de obesidad de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = SCC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+Como se ve las personas que si que se cuentan las calorías, la mayoría de las personas tienen peso normal, por otro lado, las personas que no se cuentan las calorías han desarrollado algún tipo de obesidad, obre todo obesidad de tipo I y obesidad de tipo III.
+
+```{r}
+train |>
+  ggplot(aes(x = FAF)) +
+  geom_histogram(fill = "pink", bins = 30) +
+  theme_bw()
+```
+
+Vamos a ver que relación tiene con el nivel de obesidad de las personas con la frecuencia de actividad física que hacen a la semana.
+
+```{r}
+train |>
+  ggplot(aes(x = FAF, fill = NObeyesdad)) +
+  geom_histogram(position = "dodge", bins = 8) +
+  theme_bw()
+```
+
+Podemos ver ue las personas que entrenan o que entrenan un día, es más probable que desarrollen algún tipo de obesidad, sin embargo, las personas que entrenan 3 días, la mayoría tienen peso normal, así como las personas que entrenan 2 la mayoría tiene peso insuficiente.
+
+```{r}
+train |>
+  ggplot(aes(x = TUE)) +
+  geom_histogram(fill = "pink", bins = 30) +
+  theme_bw()
+```
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad, y = TUE)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Nivel de obesidad según el uso de dispositivos electrónicos.") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Mirando el nivel de obesidad por el tiempo que se usan dispositivos electronicos, se puede ver que en proedio, las personas que más están con el movil con las que tienen peso noemal o peso insuficiente.
+
+```{r}
+train |>
+  ggplot(aes(x = CALC)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Como vemos en la distribución, la mayoría de personas de estos datos toman alcohol de vez en cuando, sin embargo tenemos a una persona que toma alcohol siempre, por lo que vamos a ver que relación hay entre tomar alcohol y el nivel de obesidad, la cantidad de agua que se toma y la frecuencia de actividad física.
+
+```{r}
+train |>
+  ggplot(aes(x = CALC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+Como se ve las personas que toman alcohol de vez en cuando, casi todas han desarrollado obesidad de tipo III. Por otro lado, las personas que no toman alcohol, desarrollan sobre todo obesidad de tipo I. Y la persona que toma alcohol siempre, podemos ver que tiene peso normal. Para saber un poco más de esto vamos a ver la frecuencia de entrenamiento.
+
+```{r}
+train |> 
+  ggplot(aes(x = CALC, y = FAF)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Consumo de alcohol por la frecuencia de entrenamiento") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
-Ahora agrupamos la categoria Mtrans (que asigna el medio de transporte que usan las personas de la muestra) en los que van andando y los que van en transporte, para ver como afecta el movimiento a la obesidad.
+Al mirar el gráfico, se puede ver que en media las personas que no toman alcohol o que lo toman frecuentemente, hacen más ejercicio que los otros dos grupos, sin embargo, la media de los grupos esta en hacer ejercicio 1 día a la semana.
 
 ```{r}
+train |> 
+  ggplot(aes(x = CALC, y = CH2O)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Consumo de alcohol por consumo de agua") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 
+POdemos ver cierta relación entre las personas que consumen alcohol y las que no, por lo que se ve, en promedio, cuanto más alcohol se consume, más agua se toma. Sin embargo, como hemos visto antes la media está en que las personas consumen 2L de agua al día. Los medios de transporte utilizados por las personas también pueden afectar al nivel de obesidad ya que pueden suponer más o menos actividad física, veremos la frecuencia de cada uno para más adelante analizarlos en función de los niveles de obesidad:
 
+```{r}
+train|> 
+  ggplot(aes(x = MTRANS)) +
+  geom_bar(fill = "pink") +
+  theme_bw() + 
+  labs(title = "Medio de transporte usado", 
+       x = "Medio de transporte (MTRANS)",
+       y = "Frecuencia absoluta")
+```
+Como vemos la mayor parte de las personas utilizan el transporte público como medio de transporte, por lo que vamos a ver su relación el nivel de obesidad. Ahora agrupamos la categoria Mtrans (que asigna el medio de transporte que usan las personas de la muestra) en los que van andando y los que van en transporte, para ver como afecta el movimiento a la obesidad.
+
+```{r}
 # Crear la nueva variable de transporte
 obesidad_transp <- train %>%
   mutate(MTRANS_grouped = case_when(
@@ -417,64 +615,32 @@ Creamos un grafico para las personas que no van andando ni en bici y así poder 
 ```{r}
 #No Walking
 
-ggplot(filter(obesidad_transp, MTRANS_grouped == "No Walking"), aes(x = NObeyesdad, fill = NObeyesdad)) +
+ggplot(filter(obesidad_transp, MTRANS_grouped == "No Walking"), aes(y = NObeyesdad, fill = NObeyesdad)) +
   geom_bar(position = "dodge") +  # Barras separadas
-  labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas que NO caminan") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
+  theme_minimal() 
 ```
 
 Ahora, para las personas que andan, es decir que se mueven creamos otro gráfico para ver su nivel de obesidad.
 
 ```{r}
 # Walking
-ggplot(filter(obesidad_transp, MTRANS_grouped == "Walking"), aes(x = NObeyesdad, fill = NObeyesdad)) +
+ggplot(filter(obesidad_transp, MTRANS_grouped == "Walking"), aes(y = NObeyesdad, fill = NObeyesdad)) +
   geom_bar(position = "dodge") +  # Barras separadas
-  labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
   ggtitle("Frecuencia de NObesity en personas que caminan") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
+  theme_minimal() 
 ```
 
 El número de personas con obesidad dentro del grupo de las que no caminan es mucho mayor que en el grupo de las que sí caminan, ya que como se puede observar en el segundo gráfico (personas que sí caminan) el número de personas con peso normal (Normal_Weight) es muy elevado. Esto se ajusta y tiene sentido en la realidad, ya que el movimiento que una persona realiza en su día a día está directamente relacionado con tener un peso más o menos elevado.
 
-```{r}
-
-ggplot(filter(obesidad_transp, family_history_with_overweight == "yes"), aes(x = NObeyesdad, fill = NObeyesdad)) +
-  geom_bar(position = "dodge") +  # Barras separadas
-  labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
-  ggtitle("Frecuencia de NObesity en personas con Historial familiar de Sobrepeso") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-```
-
-```{r}
-# Filtrar datos donde la persona NO tiene historial familiar de sobrepeso
-ggplot(filter(obesidad_transp, family_history_with_overweight == "no"), aes(x = NObeyesdad, fill = NObeyesdad)) +
-  geom_bar(position = "dodge") +  # Barras separadas
-  labs(x = "Nivel de Obesidad", y = "Frecuencia", fill = "NObesity") +
-  ggtitle("Frecuencia de NObesity en personas sin Historial familiar de Sobrepeso") +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-El primer gráfico muestra los niveles de obesidad en personas con un historial familiar de obesidad, tal y como se puede observar, cuanto mayor es el nivel de obesidad, mas personas hay con familiares con obesidad. Ya que, las categorías "peso insuficiente" y "peso normal" son las que menos gente con este historial tienen, en las categorias de sobrepeso (Overweight) el número de personas con familiares con obesidad aumenta y ya por último en las de los tres tipos de obesidad, el número de mucho mayor.
-
-En el segundo gráfico se muestra la otra categoria, pesonas sin historial familiar de sobrepeso. En este caso ocurre lo contrario, cuanto menor es el nivel de obesidad, mayor es la frecuencia con la no existe un historial familiar de sobrepeso. Cabe destacar que en los niveles de Obesidad 1 y 2, la frecuencia es casi nula y en el nivel de Obesidad 3 no hay frecuencia, por lo que no hay nadie con ese nivel de obesidad, que es el más alto, que no tenga un historial familiar de obesidad.
-
-Por tanto, podemos concluir que tener un historial familiar de obesidad afecta directamente al nivel de obesidad de la persona, ya sea por genética o por el estilo de vida. Lo mismo pasa con el consumo frecuente de calorias, la edad (las personas más jóvenes pesan menos), o el medio de transporte utlizado (si implica movimiento el nivel de obesidad es menor). Además, hacer solo una comida al día te hace ser menos propenso a padecer de algún tipo de obesidad aunque hacer las tres comidas del día no esta directamente relacionado con no padecer obesidad, al igual que fumar tampoco lo está.
-
-# **PCA**
+# 3. PCA.
 
 ## Con la función prcomp() de R:
 
 ```{r}
-library(readr)
- ironman_lake_placid_female_2022 <- read_csv("~/Escritorio/aprendizaje/ironman_lake_placid_female_2022.csv")
+ironman_lake_placid_female_2022 <- read_csv("ironman_lake_placid_female_2022.csv")
 ```
 
 Ahora trabajaremos con un conjunto de datos sobre participantes femeninas en un triatlon Ironman, las variables que utilizaremos son, Swim.Time, Run.Time y Bike.Time, mediante la función head podemos observar la estructura del conjunto de datos y sus variables:
@@ -817,9 +983,20 @@ Representándolo de esta manera la distribución es exactamente igual que la que
 
 El PCA nos ha permitido reducir la dimensión de los datos de rendimiento en el Ironman, transformando las variables originales en componentes explicativas, de las cuales PC1 Y PC2 han sido suficientemente explicativas. Por su parte, PC1 ha explicado la mayor parte de la variabilidad, indicandonos que los tiempos de nadar, correr y bicicleta están correlacionados.
 
-```
+# 4. Aprendizaje no supervisado.
 
-#Clustering
+## Matriz de distacias o semejanzas.
+
+Vamos a hacer la matriz de distacia de gower ya que tenemos variables de tipo caracter y de tipo numérico.para estos datos, vamos a cambiar las variables que son de tipo cadena de caracteres a factores.
+
+```{r}
+# Cambiar variables de tipo cadena de caracteres a factor.
+train <- train |> 
+  mutate(across(where(is.character), as.factor))
+
+# Matriz de distancias.
+dist <- as.matrix(daisy(train, metric = "gower"))
+```
 
 ## Métodos no jerarquicos
 
@@ -830,7 +1007,7 @@ El método de las k-medias es de los algoritmos de Machine Learning más utiliza
 Antes de empezar a hacer las k-medias, dado que es un algoritmo que solo admite valores tipo numéricos, vamos a crear una nueva variable para que solo tenga como columnas variables de tipo numérico y vamos a escalarlo.
 
 ```{r}
-train_num <- train %>% dplyr::select(Age, Height, Weight, FCVC, NCP, CH2O, FAF, TUE)
+train_num <- train %>% select(Age, Height, Weight, FCVC, NCP, CH2O, FAF, TUE)
 train_esc <- scale (train_num)
 ```
 
@@ -968,3 +1145,5 @@ rect.hclust(hc1, k = 5, border = 2:5)
 ```{r}
 fviz_cluster(list(data=train_esc,cluster=sub_grp), geom = "point")
 ```
+
+# 5. Conclusiones.
