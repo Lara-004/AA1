@@ -1228,6 +1228,22 @@ Las conclusiones que podemos sacar de este gráfico, donde se comparan las media
 
 - Grupo 2 (azul): Al contrario del grupo 1, es el que tiene *más personas jovenes y de menor peso que el grupo 1*.
 
-
-
 # 5. Conclusiones.
+
+Hemos analizado un conjunto de datos de obesidad de México, Perú y Colombia y así poder caracterizar los distintos niveles de obesidad según diversas variables.
+
+Utilizando varias técnicas de exploracion de datos, reduccion de dimensionalidad y aprendizaje no supervisado para realizar un análisis de los factores asociados a la obesidad en los individuos.
+
+En este análisis hemos podido identificar ciertas relaciones entre variables como el peso, altura, edad, historial familiar de sobrepeso, actividad fisica y otros factores.
+
+Las principales conclusiones que hemos podido obtener han sido:
+
+- Factores determinantes en la obesidad: Variables como el peso y la altura tienen una relacion directa con el nivel de obesidad. Y otras como los antecedentes familiares de sobrepeso tienen una mayor probabilidad de desarrollar obesidad. 
+La frecuencia de consumo de verduras, el número de comidas principales y actividad física tambien parecen influir. 
+En relación al transporte y la movilidad, se ha comprobado que personas que usan medios de transporte son más propensos a desarrollar algún tipo de obesidad frente a los que usan medios mas tradicionales como los que usan bicicleta o los que caminan.
+
+- Análisis de Componentes Principales: En esta parte hemos usado los datos de triathlon lake placid women ironman. Analizando 3 de las variables relacionadas con el rendimiento en deportes de resistencia, se ha podido reducir a dos componentes principales sin perder demasiada información para así facilitar la interpretación y la detección de patrones de rendimientos en atletas.
+
+- Aprendizaje no supervisado y clustering: A través de métodos jerárquicos y no jerárquicos, se ha conseguido identificar 2 perfiles (clusters) diferenciados en los datos, diferenciados en función de la edad y el peso
+
+En definitiva, este estudio resalta la importancia de llevar un estilo de vida saludable, evidenciando que una alimentación equilibrada, la actividad física regular y la reducción del sedentarismo son elementos fundamentales para prevenir y controlar la obesidad.
