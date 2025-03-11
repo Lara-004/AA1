@@ -1,0 +1,1261 @@
+---
+title: "Obesidad"
+author: "Marcos López García, Carmen Liberal Jiménez y Lara Montero del Prado"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    toc: yes
+    toc_float:
+      collapsed: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(HDclassif)
+library(MASS)
+library(gt)
+library(knitr)
+library(cluster)
+library (tidyverse)
+library (factoextra)
+library (NbClust)
+library (parameters)
+library (stats)
+library(summarytools)
+library(corrplot)
+```
+
+# 0. Introducción.
+
+Este conjunto de datos contienen la información para dar una estimación de los niveles de obesidad de personas residentes en Mexico, Perú y Colombia.
+
+Estos datos se han adquirido de [repositorio de datos de kaggle](https://www.kaggle.com/datasets/aravindpcoder/obesity-or-cvd-risk-classifyregressorcluster). Segun la descripción del repositorio, nos basamos en personas con edades entre 14 y 61 años y diversos hábitos alimenticios y condición física. Estos datos se han recolectado mediante una plataforma web con una encuesta donde usuarios anónimos respondieron cada pregunta.
+
+En este dataset podemos encontrar distintos tipos de variables:
+
+* Gender: Genero.
+* Age: Edad.
+* Height: Altura (m).
+* Weight: Peso (kg).
+* family_history_with_overweight: Antecedentes familiares.
+* FAVC: Consumo frecuente de alimentos de alto valor genético.
+* FCVC: Frecuencia de consumo deverduras.
+* NCP: Número de comidas principales.
+* CAEC: Consumo de alimentos entre comidas.
+* CH2O: Consumo de agua diariamente.
+* CALC: Consumo de alcohol.
+* SCC: Monitoreo del consumo de calorías.
+* FAF: Frecuencias de actividad física.
+* TUE: Tiempo utilizado dispositivos electronicos.
+* MTRANS: Transporte utilizado con frecuencia.
+* NObeyesdad: Grupos segun el nivel de obesidad, se diferencian en:
+
+  * Bajo peso: Menos de 18,5.
+  * Normal: 18,5 a 24,9.
+  * Sobrepeso: 25,0 a 29,9.
+  * Obesidad I: 30,0 a 34,9.
+  * Obesidad II: 35,0 a 39,9.
+  * Obesidad III: Mayor de 40.
+
+# 1. Data understanding.
+
+Primero de todo, vamos a cargar los datos y vamos a ver la cantidad de variables y observaciones que encontramos.
+
+```{r}
+obesidad <- read.csv("C:/Users/laram/Downloads/archive (3)/ObesityDataSet.csv")
+data <- dim(obesidad)
+```
+Podemos observar que tenemos una cantiadad de `r data[1]` observaciones y `r data[2]` variables en este dataset
+
+En estos datos, las varibles son de distintos tipos:
+```{r}
+str(obesidad)
+```
+
+Podemos ver como hay distintos tipos de variables en los datos, en el cual solo hay dos tipos, el tipo numérico `num` (`Age`, `Height`, `Weight`, `FCVV`, `NCP`, `CH2O`, `FAF`Y `TUE`) y por otro lado, tenemos vectores de caracteres `char` (`Gender`, `family_history_with_overweight`, `FAVC`, `CAEC`, `SMOKE`, `SSC`, `CALC`, `MTRANS`, `NObeyesdad`)
+
+Antes de hacer la partición de los datos para hacer un mejor análisis, vamos a observar si hay valores faltantes.
+
+```{r}
+colSums(is.na(obesidad))
+```
+
+Podemos observar que no hay variables de tipo NA, por lo que no es necesario hacer algún tipo de imputación sobre los datos para hacer el análisis de los datos. Vemos que en la variables hay ciertos valores que no tiene mucho sentido, como por ejemplo que el número de comidas principales tenga decimales y otras más, por ello vamos a corregir esoso errores.
+
+```{r}
+obesidad$Age <- round(obesidad$Age)
+obesidad$NCP <- round(obesidad$NCP)
+obesidad$FAF <- round(obesidad$FAF)
+
+```
+
+Realizamos la partición de nuestros datos.
+
+```{r}
+set.seed(1)
+
+# Indices para la partición
+nobesidad <- dim(obesidad)[1]
+indices <- 1:nobesidad
+ntrain <- nobesidad * 0.6
+indices.train <- sample(indices, ntrain, replace = FALSE)
+indices.test_val <- indices[-indices.train]
+
+# Usamos el 60% para las variables de entrenamiento
+train <- obesidad[indices.train, ]
+test_val <- obesidad[indices.test_val, ]
+
+# Creamos los indices para test y para val
+ntest_val <- dim(test_val)[1]
+indices = 1:ntest_val
+ntest <-  ntest_val * 0.5
+indices.test <- sample(indices, ntest, replace = FALSE)
+indices.val <- indices[-indices.test]
+
+# Creamos los datos de test y val
+test <- test_val[indices.test, ]
+val <- test_val[indices.val, ]
+```
+
+Miramos la información de nuestros datos de entrenamiento
+
+```{r}
+dim(train)
+head(train)
+str(train)
+```
+
+# 2. EDA.
+Vamos a comenzar con nuestro Análisis Exploratorio de Datos, que ayudará a comprender la estructura, distribución y relaciones de nuestras variables con los niveles de obesidad.
+
+Mediante una tabla de frecuencias, vamos a observar como se distribuye cada tipo de obesidad en nuestros datos
+
+```{r}
+tabla_frecuencias <- train |> 
+  count(NObeyesdad) |> 
+  mutate(f = n/nrow(train),
+         N = cumsum(n),
+         F = cumsum(f)) 
+
+knitr::kable(tabla_frecuencias, digits = 4)
+
+```
+
+Ahora vamos a hechar un vistazo a la distribución de nuestra variable objetivo.
+
+```{r}
+train |> 
+  ggplot(aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar() +
+  theme_bw() + 
+  labs(title = "Tipos de obesidad", 
+       y = "Tipo de obesidad",
+       x = "Frecuencia absoluta")
+```
+
+Como se puede ver en el gráfico, la mayoría de las personas que hay en esta variable para entrenar nuestro modelo, han desarrollado obesidad de tipo I, siguiengo el peso normal y la obesidad de tipo III. A continuación, mostramos histogramas de todas las variables continuas y una matriz de correlación, aunque mas adelante analizaremos más detalladamente algunos de ellos.
+
+```{r}
+df_continuas <- train[, sapply(train, is.numeric)]
+# Histogramas de todas las variables continuas
+par(mfrow = c(3, 3))  # Diseño de subgráficos
+graficas <- lapply(names(df_continuas), function(var) {
+  hist(df_continuas[[var]], main = paste("Histograma de", var),
+       xlab = var, ylab = "Frecuencia", col = "pink")
+})
+```
+```{r}
+# Matriz de correlación
+cor_matrix <- cor(train %>% select_if(is.numeric))
+corrplot(cor_matrix, method = "color", type = "lower", tl.col = "black")
+```
+
+Viendo esta matriz de correlaciones, podemos ver como la edad y el tiempo que se utilizan los dispositivos electrónicos, tiene una relación inversa, es decir, que cuanta más edad menos se usan, por otro lado, la altura tiene una relación con el número de comidas principales, el peso y la frecuencia de actividad física.Calculando la estadísticas descriptivas de las variables númericas obtenemos un resumen numérico de las características de los datos:
+
+```{r}
+#Estadísticas descriptivas de las variables númericas
+df_continuas |>   
+  drop_na() |>  
+    descr() 
+```
+
+```{r}
+train |> ggplot(aes(Weight)) +
+  geom_histogram(
+    fill = "pink", 
+    bins = 15,           
+    col = "white"        
+  ) +
+  theme_bw()
+```
+
+Con la tabla de frecuencias podemos observar que el conjunto de datos tiene una distribución bastante parecida entre las categorías de obesidad, con la categoría Obesity Type l siendo la más frecuente (15.72%) y Insufficient Weight la menos frecuente (12.72%). Además, en el histograma de distribución del peso se aprecia un pico alrededor de los 80 kg, por lo que podemos intuir que las personas con Obesidad Tipo l pueden tener un peso alrededor de este valor. En general, los pesos se encuentran mayoritariamente entre los 50 y 120 kg y algún valor atípico por encima de los 160 kg. Ahora vamos a analizar las demás variables y su relación con otras variable. Lo primero que vamos a ver es la distribución del género en este estudio.
+
+```{r}
+train |>
+  ggplot(aes(Gender)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Viendo el gráfico se puede ver que el número de mujeres y hombres que han participado en este estudio es bastante similar, lo que me da que pensar si el nivel de obesidad es más destacable con algún género. 
+
+```{r}
+train |>
+  ggplot(aes(x = Gender, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+Al mirar la relación entre el nivel de obesidad entre hombres y mujeres, podemos ver com en mujeres se da sobre todo la obesidad de tipo III, mientras que en hombres la obesidad de tipo II, lo que si que es curioro es que en mujeres apenas hay con obesidad de tipo II y en hombre no hay personas con obesidad de tipo III. A continuación vamos a ver como se distribuye la edad de las personas del estudio
+
+
+```{r}
+train |> 
+  ggplot(aes(Age)) +
+  geom_histogram(fill = "pink", col = "white", bins = 15) +
+  theme_bw()
+```
+
+Por lo que se ve en este estudio han participado personas bastante jóvenes, ya que la mayoría de personas tienen entre 15 y 30 años, con un pico en los 20 años. A partir de los 30 años la frecuencia disminuye con muy pocos casos por encima de los 50 años, por ello vamos a ver que relación hay con el nivel de obesidad.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad , y = Age )) +  
+  geom_boxplot() +
+  theme_bw() +  
+  labs(title = "Box-plot de Nieveles de Obesidad por edad")  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Los niveles de menor peso, Insufficient Weight y Normal Weight, tienen una mediana de edad más baja, entorno a los 20-25 años. Obesity Type l, Obesity Type ll y Obesity Type lll, tienen medianas de edad mas altas, entorno a los 25 años. Podemos observar también que Overweight Level ll tiene una variabilidad mayor en la edad. Encontramos valores atípicos que sobrepasan en la mayoría de categorías. De manera clara podemos concluir que las personas con menor peso tienden a ser más jóvenes, y las personas con un nivel de obesidad mayor tienen una media de edad más alta. Con estos datos más los de la matriz de correlación, vamos a ver la relación que hay entre la edad y el tiempo que se usan los dispositivos electrónicos.
+
+```{r}
+train |>
+  ggplot(aes(x = TUE, y = Age)) +
+  geom_point() +
+  theme_bw()
+```
+
+Por lo que vemos, hay una diferencia en la edad, lo que se puede ver que entre los 20 y los 30, hay más personas usando dispositivos electrónicos entre 0 y 2h, por otro lado, se ve como a partir de los 35 la gente usa menos el movil hasta los 45 que se ve que nadie lo usa.Ya vistos la edad y el género de las personas, vamos a ver la estatura de las personas.
+
+```{r}
+train |> 
+  ggplot(aes(Height)) +
+  geom_histogram(fill = "pink", bins = 15, col = "white") +
+  theme_bw()
+```
+
+Este histograma muestra la distribución de alturas en la muestra, la mayoria de personas tienen una altura entre 1.60 y 1.90 metros, con un pico alrededor de los 1.75 y 1.80 metros. Esto tiene sentido, ya que teniendo en cuenta el histograma de edad, la mayoria de personas son jóvenes cuyas alturas suelen estar alrededor de estas. Lo que nos da que pensar la relación que puede haber con el peso y con el nivel de obesidad de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = Height, y = Weight, color = NObeyesdad)) +
+  geom_point() +
+  theme_bw()
+```
+
+Como se ve hay una grán relación entre el peso, la altura y el nivel de obesidad, en la que cuanto más pesa y mide una personas, más posibilidad de desarrollar algún tipo de obesidad, como se ve, esta relación es lineal. Viendo este gráfico, vamos a representar el peso y la altura con el nivel de obesidad por separado.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad , y = Weight)) +  
+  geom_boxplot() +
+  theme_bw() +  
+  labs(title = "Box-plot de Niveles de Obesidad por peso") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Como podemos observar en el BoxPlot, los niveles de obesidad estan fuertemente relacionados con el peso. Las personas con un mayor peso son las que padecen de Obesidad tipo 3, dentro de esta categoria podemos observar un valor atípico, que se sale por encima del rango, y seria la persona con mas peso entorno a 172,5 kg. La siguiente clase con mas peso son las Obesidad tipo 2, donde también hay ciertos valores atípicos que está vez están por debajo del rango. La tercera categoria con mas peso es la Obesidad tipo 1, donde encontramos al mayor número de personas si recordamos el gráfico anterior. Por último, ordenadas de mayor a menor peso encontramos: Sobrepeso nivel 1, Sobrepeso nivel 2, Peso normal y Peso insuficiente.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad , y = Height )) +  
+  geom_boxplot() +
+  theme_bw() +  
+  labs(title = "Niveles de Obesidad por altura")  +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Aunque algunas categoría presentan distribuciones más amplias no parece haber una diferencia muy grande entre la altura y los niveles de obesidad. Existen valores atípicos en las categorías Obesidad tipo ll (Obesity II ) y Sobrepeso tipo ll (Overweight ll), lo que significa que hay personas con alturas significativamente mas pequeñas a la mayoria de su grupo en el caso de Obesidad tipo ll y también mayores para Sobrepeso tipo ll. Ahora vamos a ver la relación con el número de comidas principales y con la frecuencia de actividad física.
+
+```{r}
+train |>
+  ggplot(aes(x = Height, y = TUE)) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+train |>
+  ggplot(aes(x = Height, y = FAF)) +
+  geom_point() +
+  theme_bw()
+```
+Con el gráfico de tiempo de uso de dispositovos electrónicos con la altura, no se ve ninguna relación, sin embargo, se puede ver que las personas que no hacen ejercicio miden menos que las que si que lo hacen, y que las personas que hacern ejercicio 1 día a la emana, la altura tiene mayor variabilidad que los que hacen ejercicio 2o 3 días a la semana. Con estos dos boxplots, podemos ver que se ve una relación grande entre el peso y el nivel de obesidad más que con la altura y el nivel de obesidad.
+
+
+```{r}
+train|> 
+  ggplot(aes(x = family_history_with_overweight)) +
+  geom_bar(fill = "pink") +
+  theme_bw() + 
+  labs(title = "Historial familiar de sobrepeso", 
+       x = "family history with overweight",
+       y = "Frecuencia absoluta")
+```
+
+Muchas más personas tienen un historial familiar de sobrepeso de las que no lo tienen, por eso, vamos a ver si hay alguna relación con el nivel de obesidad y con el peso de las personas del estudio.
+
+```{r}
+train |>
+  ggplot(aes(x = family_history_with_overweight, fill = NObeyesdad)) +
+  geom_bar(position = "dodge")
+```
+
+Dado que la diferencia de personas en cada grupa es bastante diferente, vamos a hacer un gráfico individual para cada tipo de historial familiar.
+
+```{r}
+
+ggplot(filter(train, family_history_with_overweight == "yes"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +  # Barras separadas
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
+  ggtitle("Frecuencia de NObesity en personas con Historial familiar de Sobrepeso") +
+  theme_minimal() 
+```
+
+```{r}
+# Filtrar datos donde la persona NO tiene historial familiar de sobrepeso
+ggplot(filter(train, family_history_with_overweight == "no"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +  # Barras separadas
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
+  ggtitle("Frecuencia de NObesity en personas sin Historial familiar de Sobrepeso") +
+  theme_minimal() 
+```
+
+El primer gráfico muestra los niveles de obesidad en personas con un historial familiar de obesidad, tal y como se puede observar, cuanto mayor es el nivel de obesidad, mas personas hay con familiares con obesidad. Ya que, las categorías "peso insuficiente" y "peso normal" son las que menos gente con este historial tienen, en las categorias de sobrepeso (Overweight) el número de personas con familiares con obesidad aumenta y ya por último en las de los tres tipos de obesidad, el número de mucho mayor.
+
+En el segundo gráfico se muestra la otra categoria, pesonas sin historial familiar de sobrepeso. En este caso ocurre lo contrario, cuanto menor es el nivel de obesidad, mayor es la frecuencia con la no existe un historial familiar de sobrepeso. Cabe destacar que en los niveles de Obesidad 1 y 2, la frecuencia es casi nula y en el nivel de Obesidad 3 no hay frecuencia, por lo que no hay nadie con ese nivel de obesidad, que es el más alto, que no tenga un historial familiar de obesidad.
+
+Por tanto, podemos concluir que tener un historial familiar de obesidad afecta directamente al nivel de obesidad de la persona, ya sea por genética o por el estilo de vida. Lo mismo pasa con el consumo frecuente de calorias, la edad (las personas más jóvenes pesan menos), o el medio de transporte utlizado (si implica movimiento el nivel de obesidad es menor). Además, hacer solo una comida al día te hace ser menos propenso a padecer de algún tipo de obesidad aunque hacer las tres comidas del día no esta directamente relacionado con no padecer obesidad, al igual que fumar tampoco lo está. Ahora vamos a ver si las personas de las que se ha hecho el estudio, consumen frecuentemente alimentos con alto valor energetico.
+
+```{r}
+train |>
+  ggplot(aes(FAVC)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+Por lo que se ve muchas de las personas consumen comidas con alto valor energético, por lo que hay que ver que realción tiene eso con el nivel de obesidad.
+
+```{r}
+train |>
+  ggplot(aes(x = FAVC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge")
+```
+Por lo que se ve la mayoría de perosnas que consumen alimentos con un alto valor energético han desarrollado obesidad de tipo I, y la mayoría de personas que no consumen alimentos con un alto valor energético tienen un peso normal, por lo que necesitamos ver como se ve el peso según se consumen alimentos altos en calorias o no.
+
+```{r}
+train |>
+  ggplot(aes(x = Weight, fill = FAVC)) +
+  geom_histogram(bins = 30) +
+  theme_bw()
+```
+Con etos dos gráfico podemos concluir que cuento más peso una persona, desarrolla algún tipo de obesidad, por otro lado, también se puede ver como cuanto menos pesa una persona, menos comidas con bajo nivel de calorias come. Continuaremos analizando otra variable que tiene que ver con la dieta, FCVC que es la frecuencia del consumo de vegetales. Como esta variable es continua, observaremos su distribución por nivel de obesidad de dos maneras mediante un histograma y un boxplot:
+
+
+```{r}
+train |>
+  ggplot(aes(x = FCVC)) +
+  geom_histogram(fill = "pink", bins = 25) +
+  theme_bw()
+```
+
+Realizaremos un histograma de cada nivel de obesidad y su disatribución del consumo de vegetales para que sea mas claro, ya que al ser varios niveles en un mismo histrograma no se ve con claridad.
+
+```{r}
+ggplot(train, aes(x = FCVC, fill = NObeyesdad)) +
+  geom_histogram(binwidth = 0.5, alpha = 0.7, position = "identity") +
+  facet_wrap(~NObeyesdad) +
+  labs(x = "Frecuencia de Consumo de Vegetales", y = "Cantidad de Personas",
+       title = "Distribución del Consumo de Vegetales según Nivel de Obesidad") +
+  theme_minimal()
+```
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad, y = FCVC)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Consumo de vegetales por NIvel de Obesidad") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Viendo este boxplot, puedo ver que la frecuencia de consumo de verduras, está en torno a 2
+
+```{r}
+train |>
+  ggplot(aes(x = NCP)) +
+  geom_histogram(fill = "pink", bins = 7) +
+  theme_bw()
+```
+
+Con este diagrama de barras, se puede ver com la mayoría de las personas hacen 3 comidas principales al día, por lo que nos surge la duda de si tiene alguna relación con el nivel de obesidad y con el peso.
+
+```{r}
+train |>
+  ggplot(aes(x = NCP, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+En nuestro estudio, se ve como el nivel de obesidad no tiene mucho que ver, ya qeu hay personas con peso insuficiente que hacer 4 comidas al día o que hay personas que haciendo una comida al día han desarrollado obesidad de tipo I.
+
+```{r}
+train |>
+  ggplot(aes(x = Weight, y = NCP)) +
+  geom_point() +
+  theme_bw()
+```
+
+Con estos gráficos, se puede concluir lo que ya se ha visto con el número de comidas principales que hay, y es que la mayoría de las personas hacen 3 comidas principaes al día, además de eso, se ve como donde más varía el peso de las personas es con 3 comidas al día, ya que es donde más concentración de personas hay ahí. Ahora vamos a ver el consumo de alimentos entre comidas de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = CAEC)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Vemos que muchas personas comen entre comidas esporádicamente, por ello vamos a compararlo con el nivel de obesidad.
+
+```{r}
+train |>
+  ggplot(aes(x = CAEC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+Podemos ver com las personas que consumen siempre son personas con peso normal, además de eso la mayoría de personas que consumen comidas entre horas esporádicamente han desarrollado algún tipo de obesidad, por lo que se puede concluir, según este gráfico, que las personas que consumen alimentos entre horas tienen meos posibilidades de desarrollar algún tipo de obesidad. Ahora vamos a ver si las personas fuman o no.
+
+```{r}
+train |>
+  ggplot(aes(x = SMOKE)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Por lo que se ve la mayoría de las personas no fuman, sin embargo, me gustaría ver esta variable dependiendo de si hacen ejercicio o no y del nivel de obesidad de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = SMOKE, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+```{r}
+train |> 
+  ggplot(aes(x = SMOKE, y = FAF)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Freciemcoa de actividad física por si fuma o no")
+```
+
+Podemos ver que las personas que no fuman, hacen actividad física muchas más veces a la semana que los que si fuman sin embargo, tenemos un valor atípico que fuma y hacer ejercicio 3 días a la semana. Por otro lado, se ve como el fumar o no, no está muy relacionado con el nivel de obesidad que desarrollan las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = CH2O)) +
+  geom_histogram(fill = "pink", bins = 30) +
+  theme_bw()
+```
+
+Viendo el consumo de agua que tiene las personas, se ve como la mayoría de ellas consumen 2L al día, por lo que me pregunto la relación que tiene con la actividad física y con el nivel de obesidad.
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad, y = CH2O)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Nivel de obesidad por consumo de agua al día") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Se puede ver como la media está en 2L por los niveles de obesidad, cosa que no nos sorprenda, ya que en la distribución del agua, la mayoría bebia 2L, sin embargo se puede ver que las personas que desarrollan un nivel de obesidad, la mayoría, beben como mínimo 1.5L mientras que las personas con peso insuficient o peso normal, beben por lo menos 1L.
+
+```{r}
+train |> 
+  ggplot(aes(x = FAF, y = CH2O)) +  
+  geom_point() +  
+  theme_bw() 
+```
+
+En las personas que entrenan 0, 1 o 2 días a la semana se ven datos que no me sorprenden por la cantidad de personas que hay en cada uno, sin embargo, las personas que entrenana 3 días a la semana benben como mínimo 2 L al día, por otro lado hay valores atípicos, como una persona que entrena 3 días y bebe 1L. A continuación vamos a ver si las personas se cuentan las calorias que consumen o no.
+
+```{r}
+train |>
+  ggplot(aes(x = SCC)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Por lo que se ve la mayoría de las personas de las que se ha hecho el estudio no se cuentan las calorías que consumen, por lo que vamos a ver si esto tiene relación con el nivel de obesidad de las personas.
+
+```{r}
+train |>
+  ggplot(aes(x = SCC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+Como se ve las personas que si que se cuentan las calorías, la mayoría de las personas tienen peso normal, por otro lado, las personas que no se cuentan las calorías han desarrollado algún tipo de obesidad, obre todo obesidad de tipo I y obesidad de tipo III.
+
+```{r}
+train |>
+  ggplot(aes(x = FAF)) +
+  geom_histogram(fill = "pink", bins = 30) +
+  theme_bw()
+```
+
+Vamos a ver que relación tiene con el nivel de obesidad de las personas con la frecuencia de actividad física que hacen a la semana.
+
+```{r}
+train |>
+  ggplot(aes(x = FAF, fill = NObeyesdad)) +
+  geom_histogram(position = "dodge", bins = 8) +
+  theme_bw()
+```
+
+Podemos ver ue las personas que entrenan o que entrenan un día, es más probable que desarrollen algún tipo de obesidad, sin embargo, las personas que entrenan 3 días, la mayoría tienen peso normal, así como las personas que entrenan 2 la mayoría tiene peso insuficiente.
+
+```{r}
+train |>
+  ggplot(aes(x = TUE)) +
+  geom_histogram(fill = "pink", bins = 30) +
+  theme_bw()
+```
+
+```{r}
+train |> 
+  ggplot(aes(x = NObeyesdad, y = TUE)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Nivel de obesidad según el uso de dispositivos electrónicos.") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+Mirando el nivel de obesidad por el tiempo que se usan dispositivos electronicos, se puede ver que en proedio, las personas que más están con el movil con las que tienen peso noemal o peso insuficiente.
+
+```{r}
+train |>
+  ggplot(aes(x = CALC)) +
+  geom_bar(fill = "pink") +
+  theme_bw()
+```
+
+Como vemos en la distribución, la mayoría de personas de estos datos toman alcohol de vez en cuando, sin embargo tenemos a una persona que toma alcohol siempre, por lo que vamos a ver que relación hay entre tomar alcohol y el nivel de obesidad, la cantidad de agua que se toma y la frecuencia de actividad física.
+
+```{r}
+train |>
+  ggplot(aes(x = CALC, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +
+  theme_bw()
+```
+
+Como se ve las personas que toman alcohol de vez en cuando, casi todas han desarrollado obesidad de tipo III. Por otro lado, las personas que no toman alcohol, desarrollan sobre todo obesidad de tipo I. Y la persona que toma alcohol siempre, podemos ver que tiene peso normal. Para saber un poco más de esto vamos a ver la frecuencia de entrenamiento.
+
+```{r}
+train |> 
+  ggplot(aes(x = CALC, y = FAF)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Consumo de alcohol por la frecuencia de entrenamiento") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Al mirar el gráfico, se puede ver que en media las personas que no toman alcohol o que lo toman frecuentemente, hacen más ejercicio que los otros dos grupos, sin embargo, la media de los grupos esta en hacer ejercicio 1 día a la semana.
+
+```{r}
+train |> 
+  ggplot(aes(x = CALC, y = CH2O)) +  
+  geom_boxplot() +  
+  theme_bw() +  
+  labs(title = "Consumo de alcohol por consumo de agua") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+POdemos ver cierta relación entre las personas que consumen alcohol y las que no, por lo que se ve, en promedio, cuanto más alcohol se consume, más agua se toma. Sin embargo, como hemos visto antes la media está en que las personas consumen 2L de agua al día. Los medios de transporte utilizados por las personas también pueden afectar al nivel de obesidad ya que pueden suponer más o menos actividad física, veremos la frecuencia de cada uno para más adelante analizarlos en función de los niveles de obesidad:
+
+```{r}
+train|> 
+  ggplot(aes(x = MTRANS)) +
+  geom_bar(fill = "pink") +
+  theme_bw() + 
+  labs(title = "Medio de transporte usado", 
+       x = "Medio de transporte (MTRANS)",
+       y = "Frecuencia absoluta")
+```
+Como vemos la mayor parte de las personas utilizan el transporte público como medio de transporte, por lo que vamos a ver su relación el nivel de obesidad. Ahora agrupamos la categoria Mtrans (que asigna el medio de transporte que usan las personas de la muestra) en los que van andando y los que van en transporte, para ver como afecta el movimiento a la obesidad.
+
+```{r}
+# Crear la nueva variable de transporte
+obesidad_transp <- train %>%
+  mutate(MTRANS_grouped = case_when(
+    MTRANS %in% c("Automobile", "Motorbike", "Public_Transportation") ~ "No Walking",
+    MTRANS %in% c("Walking", "Bike") ~ "Walking",
+    TRUE ~ MTRANS # En caso de valores inesperados
+  ))
+```
+
+Creamos un grafico para las personas que no van andando ni en bici y así poder visualizar su nivel de obesidad.
+
+```{r}
+#No Walking
+
+ggplot(filter(obesidad_transp, MTRANS_grouped == "No Walking"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +  # Barras separadas
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
+  ggtitle("Frecuencia de NObesity en personas que NO caminan") +
+  theme_minimal() 
+```
+
+Ahora, para las personas que andan, es decir que se mueven creamos otro gráfico para ver su nivel de obesidad.
+
+```{r}
+# Walking
+ggplot(filter(obesidad_transp, MTRANS_grouped == "Walking"), aes(y = NObeyesdad, fill = NObeyesdad)) +
+  geom_bar(position = "dodge") +  # Barras separadas
+  labs(y = "Nivel de Obesidad", x = "Frecuencia", fill = "NObesity") +
+  ggtitle("Frecuencia de NObesity en personas que caminan") +
+  theme_minimal() 
+```
+
+El número de personas con obesidad dentro del grupo de las que no caminan es mucho mayor que en el grupo de las que sí caminan, ya que como se puede observar en el segundo gráfico (personas que sí caminan) el número de personas con peso normal (Normal_Weight) es muy elevado. Esto se ajusta y tiene sentido en la realidad, ya que el movimiento que una persona realiza en su día a día está directamente relacionado con tener un peso más o menos elevado.
+
+# 3. PCA.
+
+## Con la función prcomp() de R:
+
+```{r}
+ironman_lake_placid_female_2022 <- read_csv("C:/Users/laram/Downloads/archive (3)/ironman_lake_placid_female_2022.csv")
+```
+
+Ahora trabajaremos con un conjunto de datos sobre participantes femeninas en un triatlon Ironman, las variables que utilizaremos son, Swim.Time, Run.Time y Bike.Time, mediante la función head podemos observar la estructura del conjunto de datos y sus variables:
+
+```{r}
+head(ironman_lake_placid_female_2022)
+```
+
+Resumen estadístico de cada variable:
+
+```{r}
+summary(ironman_lake_placid_female_2022)
+```
+
+Observamos la estructura de dataset:
+
+```{r}
+str(ironman_lake_placid_female_2022)
+```
+
+Como hemos mencionado previamente, las variables que usaremos para PCA son Swim.Time, Run.Time, y Bike.Time (tiempo en cada tipo de carrera), por lo tanto las seleccionamos:
+
+```{r}
+#Seleccionamos solo las variables necesarias para hacer el PCA, que son Swim.Time, Bike.Time y Run.Time
+ironman_numeric <- ironman_lake_placid_female_2022[, c("Swim.Time", "Bike.Time", "Run.Time")]
+```
+
+```{r}
+#Eliminamos filas con valores NA
+ironman_numeric <- na.omit(ironman_numeric)
+
+# Verificamos si hay valores NA
+sum(is.na(ironman_numeric))
+
+#Verificamos que no haya varianza cero en las columnas
+ironman_numeric <- ironman_numeric[, sapply(ironman_numeric, function(col) var(col, na.rm = TRUE) > 0)]
+```
+
+Realizamos el análisis de componentes principales (PCA) que se basa en simplificar la estructura de datos, preservando al mismo tiempo la mayor cantidad posible de información. Este método convierte un grupo de variables originales en un conjunto nuevo de variables no correlacionadas llamadas componentes principales. Estas nuevas variables capturan la variabilidad presente en los datos de manera más eficiente.
+
+Con la función prcomp realizamos el PCA:
+
+```{r}
+# Aplicar PCA con escalado
+pca_result <- prcomp(ironman_numeric, scale. = TRUE)
+```
+
+```{r}
+dim(pca_result$x)
+```
+
+Nuestro PCA nos da un total de 3 componentes principales (PC1, PC2 Y PC3) y 489 atletas
+
+Visualizamos la importancia relativa de cada componente:
+
+```{r}
+pca_result <- prcomp(ironman_numeric, scale=T)
+
+# Graficamos el PCA para observar la varianza que explica cada componente
+plot(pca_result, col = c("coral", "brown", "pink"), 
+     main = "Varianza Explicada por Componentes", 
+     xlab = "Componentes Principales")
+
+
+axis(1, at=1:3, labels=c("PC1", "PC2", "PC3"))
+
+```
+
+```{r}
+summary(prcomp(ironman_numeric,scale=T))
+```
+
+Como podemos observar, la variabilidad de los datos la explica principalmente la componente principal PC1, ya que en el gráfico de barras es significativamente más alta que las demás. Además en la matriz Rotation PC1 explica el 56,71% de la varianza total. La segunda componente más influyente es PC2, que explica un 33,26%, con las dos primeras variables explicamos el 90% de la variabilidad. A la segunda componente principal la sigue PC3 con un 10%, por lo que esta última es la menos explicativa.
+
+```{r}
+#Desviaciones típicas de los autovalores
+prcomp(ironman_numeric, scale=T)$sdev
+#cantidad de variabilidad explicada por cada componente principal
+```
+
+Las desviaciones típicas explican también la cantidad de variabilidad explicada por cada componente principal y PC1 es la mayor y por tanto las que más explica.
+
+Por tanto, las dos primeras componentes principales PC1 Y PC2, son suficientemente representativas como para realizar un gráfico de los datos con ellas, ya que explican la mayor parte de la varianza.
+
+Continuamos representando la matriz de rotacion, cuyos valores muestran cuanto contribuye cada variable original a cada componente principal:
+
+```{r}
+# Rotation representa la matriz de rotacion
+prcomp(ironman_numeric, scale=T)$rotation
+```
+
+PC1 asigna pesos a las variables y como se ve en la matriz todas tienen un peso con el mismo signo lo que significa que hace un promedio ponderado de las variables principales.
+
+```{r}
+plot(prcomp(ironman_numeric,scale=T)$x[,1:2], col = adjustcolor("cyan3"))
+```
+
+Representamos los datos en las dos primeras componentes principales, PC1 Y PC2. La mayoría de los datos están agrupados entorno al valor 0 de la segunda componente principal, por lo que parece que las diferencias entre los datos en la dimensión capturada por PC2 no son muy grandes. Sin embargo, nos encontramos con un valor excepcional el cual se encuentra por debajo del valor -20 de PC2, lo que sugiere que puede tratarse de un atleta con características númericas diferentes en algunas de las variables consideradas. Para analizarlo, vamos a representar los datos con el nombre de cada atleta:
+
+```{r}
+#Hacemos que ironman_numeric sea un dataframe para poder poner los nombres 
+ironman_numeric <- as.data.frame(ironman_numeric)  
+rownames(ironman_numeric) <- ironman_lake_placid_female_2022$Name
+
+plot(prcomp(ironman_numeric,scale=T)$x[,1:2], type='n')
+text(prcomp(ironman_numeric,scale=T)$x[,1:2],labels=rownames(ironman_numeric))
+```
+
+Como podemos leer, la atleta con valores extremos es Dominique Charron:
+
+```{r}
+ironman_lake_placid_female_2022[ironman_lake_placid_female_2022$Name == "Dominique Charron", c("Run.Time", "Bike.Time", "Swim.Time")]
+
+```
+
+```{r}
+colMeans(ironman_lake_placid_female_2022[, c("Run.Time", "Bike.Time", "Swim.Time")], na.rm = TRUE)
+
+```
+
+Comparándolo con la media de las columnas, la media del valor de Swim.time es 88,1032 y sin embargo, el valor de Swim.Time de Dominique Charron es 3498, por lo que es un valor atípico y su punto en el gráfico se aleja significativamente del resto, vamos a probar a representarlo quitando a esta atleta:
+
+```{r}
+# Eliminar la fila 183 
+ironman_numeric <- ironman_numeric[-183, ] 
+plot(-prcomp(ironman_numeric, scale=T)$x[,1:2], col = adjustcolor("cyan3"))
+```
+
+Podemos observar una tendencia a la agrupación en la zona central, por lo que interpretamos que la mayoría de atletas tienen un rendimiento similar entre ellas. Sin embargo, también hay ciertos puntos más alejados de la zona central y por tanto más lejos del resto. Esto nos sugiere que hay atletas con un rendimiento diferenciable, pero sin valores extremadamente alejados como era el caso de Dominique Charron. No podemos observar una separación clara en distintos grupos, pero los valores más cercanos entre ellos tendrán un rendimiento similar.
+
+Además, tal y como hemos visto en la matriz de rotación, como todas las variables originales, (Bike Time, Swim Time y Run Time) tienen pesos negativos en PC1, cuanto mas a la izquierda en el eje x, que es el correspondiente a PC1, mayor es su tiempo en las disciplinas. Por lo tanto, los valores mas a la izquierda corresponden a atletas mas lentos, veamos cuales son los más destacados:
+
+```{r}
+ironman_lake_placid_female_2022 <- ironman_lake_placid_female_2022[-183, ] 
+rownames(ironman_numeric) <- ironman_lake_placid_female_2022$Bib
+plot(-prcomp(ironman_numeric, scale=T)$x[,1:2],type="n")
+text(-prcomp(ironman_numeric,scale=T)$x[,1], -prcomp(ironman_numeric, scale=T)$x[,2],rownames(ironman_numeric), col = adjustcolor("cyan3"))
+```
+
+Los datos que más a la derecha se encuentran y por tanto deberían ser las atletas más rápidas son los números 3 y 5, vamos a analizar los tiempos de estas atletas en cada una de las disciplinas y ver si efectivamente coincide que sean más rápidas:
+
+```{r}
+ironman_lake_placid_female_2022[ironman_lake_placid_female_2022$Bib == "3", c("Name", "Run.Time", "Bike.Time", "Swim.Time") ]
+#La mas a la derecha
+```
+
+```{r}
+ironman_lake_placid_female_2022[ironman_lake_placid_female_2022$Bib == "5", c("Name", "Run.Time", "Bike.Time", "Swim.Time") ]
+#La mas a la derecha
+```
+
+Media de los tiempos de todas las atletas en cada disciplina:
+
+```{r}
+pca_result$center
+```
+
+Efectivamente, si lo comparamos con la media de todas las corredoras, Sarah True (3) y Rachel Zilinskas (5) tienen tiempos muy por debajo de la media en las tres disciplinas.
+
+Ahora, realizaremos el mismo análisis para el punto que se encuentra más a la izquierda, que corresponde a la atleta 101.
+
+```{r}
+ironman_lake_placid_female_2022[ironman_lake_placid_female_2022$Bib == "101", c("Name", "Run.Time", "Bike.Time", "Swim.Time") ]
+#La mas a la izquierda
+```
+
+Esta vez, los tiempos de esta atleta están muy por encima de la media, por lo que podemos concluir que efectivamente las atletas mas lentas, y por tanto con tiempos mayores, se encuentran mas a la derecha.
+
+Ahora, lo representamos por colores según si ha superado la media en todas las categorías, si no ha superado la media en ninguna y si lo ha superado en algunas si y en otras no, y como podemos observar en el siguiente gráfico coincide con nuestras conclusiones anteriores:
+
+```{r}
+# Calcular el PCA
+pca_result <- prcomp(ironman_numeric, scale = TRUE)
+
+# Medias de cada disciplina
+media_swim <- 88.1032
+media_bike <- 424.7561
+media_run  <- 324.5799
+
+swim_times <- ironman_lake_placid_female_2022$Swim.Time
+bike_times <- ironman_lake_placid_female_2022$Bike.Time
+run_times  <- ironman_lake_placid_female_2022$Run.Time
+
+colores <- ifelse(swim_times < media_swim & bike_times < media_bike & run_times < media_run, "slateblue3", 
+           ifelse(swim_times > media_swim & bike_times > media_bike & run_times > media_run, "indianred2",    
+                  "seagreen3")) 
+plot(-pca_result$x[, 1:2], col = colores, pch = 16, 
+     xlab = "PC1", ylab = "PC2", main = "PCA según tiempos en Swim, Bike y Run")
+
+# Agregar una leyenda para interpretar los colores
+legend("topright", legend = c("Más rápida en todo", "Mixta", "Más lenta en todo"), 
+       col = c("slateblue3", "seagreen3", "indianred2"), pch = 16)
+
+
+```
+
+Realizamos un biplot para ver información sobre las variables principales:
+
+```{r}
+biplot(prcomp(ironman_numeric,scale=T)) 
+```
+
+La variable PC1 ahora muestra valores negativos a la izquierda y positivos a la derecha, con los tiempos de natación, ciclismo y carrera apuntando hacia valores positivos de PC1. Esto indica que los atletas con tiempos más altos en estas disciplinas se encuentran en la parte derecha del gráfico, mientras que los más rápidos (con tiempos menores) están a la izquierda. Además la corredora Sarah True, que como hemos observado anteriormente es corredora rápida, ahora aparece correctamente en el lado izquierdo del gráfico, lo que cofirma la idea de que tiempos más cortos correspondan a valores más bajos en PC1.
+
+Los vectores de Swim.Time, Bike.Time y Run.Time muestran cómo se relacionan las variables originales con los componentes principales e indican la dirección en la que crecen los valores de cada variable.
+
+Los vectores apuntan hacia la derecha, lo que sugiere que valores más altos en estas variables están asociados con valores más altos en PC1. Los tres vectores están relativamente alineados, lo que significa que las tres variables están correlacionadas: una atleta con un tiempo alto en natación probablemente también tenga tiempos altos en ciclismo y carrera.
+
+Nuestros datos proyectados en el nuevo espacio PCA son:
+
+```{r}
+pca_result <- prcomp(ironman_numeric, center = TRUE, scale. = FALSE)
+print(head(pca_result$x))
+```
+
+Cada fila es una atleta y cada columna (PC1, PC2 Y PC3) una variable del PCA que son combinaciones lineales de las variables originales. Además, un valor más alto o más bajo en PC1 indica que indica que ese atleta está más alejado del promedio en términos de la variabilidad capturada por ese componente.
+
+## Sin usar ninguna función de R específicamente definida para obtener las componentes principales:
+
+**Matriz de covarianza**: El primer paso para realizar un análisis PCA, es calcular la matriz de covarianza.
+
+```{r}
+#Seleccionamos solo las variables necesarias para hacer el PCA, que son Swim.Time, Bike.Time y Run.Time
+ironman_numeric2 <- ironman_lake_placid_female_2022[, c("Swim.Time", "Bike.Time", "Run.Time")]
+cov_matrix <- cov(ironman_numeric2)
+cov_matrix
+```
+
+**Componentes principales:** El siguiente paso es calcular los autovalores y autovectores usando la matriz de covarianza:
+
+```{r}
+#Usamos la función eigen para sacar la descomposición
+eigen_decomp <- eigen(cov_matrix)
+```
+
+Sacamos autovalores:
+
+```{r}
+autovalores <- eigen_decomp$values
+autovalores
+```
+
+Sacamos autovectores:
+
+```{r}
+autovectores <- eigen_decomp$vectors
+autovectores
+```
+
+Los autovalores y autovectores están ordenados de mayor a menor.
+
+**Selección de componentes principales:**
+
+Anteriormente, habiamos ordenado los autovalores y autovectores de mayor a menor, ya que los primeros componentes principales explican la mayor varianza.
+
+Calcularemos la varianza explicada por cada componente principal diviendo cada autovalor por la suma total de autovalores:
+
+```{r}
+varianza_explicada <- autovalores / sum(autovalores)
+varianza_explicada
+
+```
+
+La varianza explicada nos muestra el porcentaje de varianza que explica cada componente. Por tanto, la primera componente explica el 83,78% de la varianza, el segundo componente PC2 explica un 14,67% de la varianza y PC3 un 1,5%. Esto ya nos indica que la primera componente principal explica la mayor parte de la varianza y junto con la segunda, ya suman practicamente toda, para verlo aun mas claro, usaremos la varianza acumulada:
+
+```{r}
+varianza_acumulada <- cumsum(varianza_explicada)
+varianza_acumulada
+```
+
+Esto es simplemente la suma acumulada de la varianza explicada y efectivamente, las dos primeras componentes principales explican un 98,45% de la varianza.
+
+```{r}
+colores <- c("coral", "brown", "pink")
+
+plot(varianza_acumulada, type="b", xlab="Número de Componentes", 
+     ylab="Varianza Acumulada", main="Varianza Acumulada",
+     pch=19, col=colores, cex=1.2)
+
+legend("bottomright", legend=paste("PC", 1:length(varianza_acumulada)), 
+       col=colores, pch=19, title="Componentes Principales")
+```
+
+Usando este gráfico que representa la varianza acumulada por cada componente (que son los puntos) observamos como el primer punto (PC1), explica ya casi un 85% y con el segundo llegan casi a explicar toda la varianza. Si nos fijamos el codo del gráfico (punto donde la pendiente cambia bruscamente) es PC2, por lo que a partir de ahí la siguiente componente no aporta mucha información.
+
+Por tanto, seleccionamos las dos primeras componentes principales, PC1 y PC2, que capturan una cantidad muy significativa de la varianza total.
+
+**Transformación de datos:**
+
+Nuestras variables originales se transforman en un nuevo conjunto de variables, que son las componentes principales, son ortogonales entre sí por lo que no están correlacionadas y capturan la máxima varianza posible de los datos.
+
+Los datos proyectados en el nuevo espacio:
+
+```{r}
+#Aquí centramos los datos restando la media de cada variable
+datos_centrados <- scale(ironman_numeric2, center = TRUE, scale = FALSE)
+
+#Multiplicamos la matriz centrada por la matriz de autovectores
+datos_pca <- datos_centrados %*% autovectores
+
+# Mostrar los primeros valores transformados
+print("Datos proyectados en el nuevo espacio PCA:")
+print(head(datos_pca))
+
+```
+
+Cada columna es una componente principal y cada fila es una observación, esto es lo equivalente a la operación **(pca_result\$x)** con prcomp() que hemos realizado en el apartado anterior:
+
+```{r}
+pca_result <- prcomp(ironman_numeric, center = TRUE, scale. = FALSE)
+print(head(pca_result$x))
+```
+
+Ambos representan la proyección de los datos en el nuevo espacio y el resultado es el mismo. La única diferencia son los signos de PC1 Y PC2, que son contrarios en la primera y segunda representación, pero esto se debe a que los autovectores pueden tener la dirección invertida sin alterar la varianza explicada ni la relación entre los datos.
+
+Si representamos los datos proyectados en el espacio de PC1 Y PC2 obtenemos:
+
+```{r}
+plot(datos_pca[,1:2], xlab="PC1", ylab="PC2", 
+     main="Datos proyectados en el espacio de los componentes principales", col = adjustcolor("cyan3"))
+```
+
+Comparándolo con la representación de hecha con prcomp():
+
+```{r}
+# Eliminar la fila 183 
+ironman_numeric <- ironman_numeric[-183, ] 
+plot(-prcomp(ironman_numeric, scale=T)$x[,1:2], col = adjustcolor("cyan3"))
+```
+
+Las principales diferencias entre las representaciones son dos, la escala de los ejes que se debe a la funcion scale = T de la función prcomp() que ha normalizado las variables antes de calcular el PCA. La otra diferencia es la distribución de los puntos, pero a pesar de no ser iguales están distribuidos de manera similar, esto también puede deberse a la diferencia en el escalado, veamos que ocurre si lo representamos con prcomp() pero sin scale=T:
+
+```{r}
+# Eliminar la fila 183 
+ironman_numeric <- ironman_numeric[-183, ] 
+plot(-prcomp(ironman_numeric)$x[,1:2], col = adjustcolor("cyan3"))
+```
+
+Representándolo de esta manera la distribución es exactamente igual que la que hemos obtenido programando a mano. Por tanto, las conclusiones obtenidas del PCA son las mismas ya que hemos llegado al mismo resultado.
+
+El PCA nos ha permitido reducir la dimensión de los datos de rendimiento en el Ironman, transformando las variables originales en componentes explicativas, de las cuales PC1 Y PC2 han sido suficientemente explicativas. Por su parte, PC1 ha explicado la mayor parte de la variabilidad, indicandonos que los tiempos de nadar, correr y bicicleta están correlacionados.
+
+# 4. Aprendizaje no supervisado.
+
+## Matriz de distacias o semejanzas.
+
+Vamos a diseñar una matriz de distancias según las características de nuestros datos.
+
+En el EDA ya hemos visto como tenemos tanto datos numéricos como datos categóricos. Es por eso que calcular una matriz de distancias euclidiana no es buena idea ya que se necesitan datos numéricos y apenas la mitad de nuestros datos lo son, por lo que la mejor matriz de distancias que se ajusta más a nuestros datos, dado que tenemos tanto de tipo categóricas y continuas, es hacer la **matriz de distancias de Gower**.
+
+Antes de crear la matriz vamos a transformar las variables de tipo cadena de caracteres a factor para evitar posibles errores.
+
+```{r}
+library(corrplot)
+# Cambiar variables de tipo cadena de caracteres a factor.
+train <- train |> 
+  mutate(across(where(is.character), as.factor))
+
+# Matriz de distancias.
+M_dist <- as.matrix(daisy(train, metric = "gower"))
+```
+
+
+## Comprobar si cumple las condiciones para ser una métrica o una medida de desemejanza
+
+Primero vamos a ver cuales son las condiciones para que sea una métrica:
+
+La medida de desemejanza entre dos observaciones \( x \) e \( y \) es una función \( \delta(x, y) \) que cumple las siguientes propiedades:
+
+\begin{itemize}
+    \item \textbf{Coincidencia:} 
+    \[
+    \delta(x, y) = 0 \iff x = y
+    \]
+    \item \textbf{No negatividad:} 
+    \[
+    \delta(x, y) \geq 0
+    \]
+    \item \textbf{Simetría:} 
+    \[
+    \delta(x, y) = \delta(y, x)
+    \]
+\end{itemize}
+
+Si, además, la función \( \delta(x, y) \) verifica la desigualdad triangular, se trataría de una distancia \textbf{\textcolor{yellow}{métrica}}:
+
+\[
+\delta(x, y) \leq \delta(x, z) + \delta(y, z)
+\]
+
+En resumen, si una función de distancia cumple estas propiedades, se considera una \textbf{métrica}. Si no cumple la desigualdad triangular pero sí las otras condiciones, se considera una \textbf{medida de desemejanza}.
+  
+
+```{r}
+# Verificar si la matriz de Gower cumple las condiciones para ser una métrica
+
+# 1. No negatividad
+no_negatividad <- all(M_dist >= 0)
+
+# 2. Identidad del indiscernible
+identidad_indiscernible <- all(diag(M_dist) == 0)
+
+# 3. Simetría
+simetria <- all(M_dist == t(M_dist))
+
+print(no_negatividad, identidad_indiscernible, simetria)
+```
+
+Ahora vamos a ver si cumple la desigualdad triangular:
+
+```{r}
+n <- nrow(M_dist)
+
+# Verificación de la desigualdad triangular
+desigualdad_triangular <- TRUE
+
+for (i in 1:n) {
+  for (j in 1:n) {
+    for (k in 1:n) {
+      if (M_dist[i, k] > M_dist[i, j] + M_dist[j, k]) {
+        desigualdad_triangular <- FALSE
+        break
+      }
+    }
+    if (!desigualdad_triangular) break
+  }
+  if (!desigualdad_triangular) break
+}
+
+# Imprimir resultado
+if (desigualdad_triangular) {
+  print("La matriz de Gower cumple la desigualdad triangular (es una métrica).")
+} else {
+  print("La matriz de Gower NO cumple la desigualdad triangular (no es una métrica).")
+}
+```
+
+Dado que las 3 primeras condiciones las cumple y la desigualdad triangular no, entonces **no es una métrica**, pero **sí es una medida de desemejanza**
+
+# Métodos no jerárquicos
+
+Primero, vamos a usar el método de las k-medias.
+
+El método de las k-medias es de los algoritmos de Machine Learning más utilizado para la agrupación de observaciones en un conjunto de k clústeres. Don de k es un valor que hay que fijarlo de antemano.
+
+Vamos a usar la matriz de Gower que hemos calculado antes.
+
+### Número óptimo de clusters
+
+Para ver el número óptimo de clusters, vamos a usar 4 métodos: el método del codo y el método de la silueta.
+
+**- El método del codo**
+
+Según este método, el número mas óptimo de clusters es cuando se da un cambio abrupto en la pendiente de la función
+
+```{r}
+fviz_nbclust(M_dist, kmeans, method = "wss")
+```
+
+Analizando la gráfica que nos da, podemos decir que en **el número óptimo de clusters necesarios sería 2** si usamos el método del codo.
+
+**- Método de la silueta**
+
+Este método nos ayuda a valorar la coherencia (o calidad) de los resultados de los clusters, es decir, determina hasta qué punto cada observacion se encuentra correctamente ubicada dentro de su agrupación.
+
+Este algoritmo nos señala con una línea discontinua vertical el número mas óptimo
+
+```{r}
+fviz_nbclust(M_dist, kmeans, method = "silhouette")
+```
+
+Este algoritmo nos dice que **el número óptimo de clusters es 2**. 
+
+Para confirmar lo que nos dice este método, vamos a comprobar si haciendo el algoritmo de las k-medias con 2 centros (2 clusters) nos puede dar una buena agrupacion interpretando el gráfico de siluetas. 
+
+```{r}
+# k-medias con 2 centros
+k2 <- kmeans(M_dist, centers = 2, nstart = 50)
+
+# Gráfica de siluetas
+sil <- silhouette(k2$cluster, dist (M_dist))
+fviz_silhouette(sil)
+```
+
+Para interpretar el gráfico, hay que fijarse en los valores positivos y negativos. Aquellos que sean mas próximos a 1, es que la observación está bien agrupada, mientras que cuando esté mas cerca de 0 es que está mal agrupada. 
+
+Ahora, analizando la gráfica que tenemos, podemos concluir que **una aproximacion de 2 clusters es óptima**, a pesar de que uno de los dos grupos tengan valores negativos
+
+Dado que con estos métodos nos ha dado que el número óptimo de clusters es 2, vamos a hacer k-means son 2 clusters:
+
+```{r}
+k2 <- kmeans(M_dist, centers = 2, nstart = 50)
+
+fviz_cluster(k2, data = M_dist, geom = "point")
+```
+
+```{r}
+k2$withinss
+k2$totss
+k2$betweenss
+```
+
+- Suma de cuadrados dentro del cluster (withinss): para el primer cluster nos da 7.38 y el segundo 9.99, lo que nos dice que son homogéneos.
+
+- Suma de cuadrados total (totss): Un valor más bajo indica clusters más compactos. En nuestro caso, la suma de cuadrados total es de 30.59.
+
+Por lo que nos da a entender que los dos clusters están medianamente igualados.
+
+## Métodos jerárquicos
+
+### Cluster Jerárquico Aglomerativo
+
+Primero vamos a entender este tipo de cluster jerárquico.
+
+Se empieza con n conglomerados, uno por cada dato y en cada paso se van fusionando los 2 grupos más similares, hasta que llega a un punto en que se queda en un solo grupo que contiene a todos.
+
+Primero vamos a ver el coeficiente aglomerativo. Cuanto mas cercano a 1, más fuerte es el agrupamiento. Para tener más opiniones sobre qué tipo de método usar, vamos a ver el coeficiente aglomerativo de 4 métodos: Average, Single, Complete, Ward
+
+```{r}
+m <- c( "average", "single", "complete", "ward")
+names(m) <- c( "average", "single", "complete", "ward")
+
+# Función para calcular el coeficiente de agrupamiento
+ac <- function(x) {
+  agnes(M_dist, method = x)$ac
+}
+
+map_dbl(m, ac)
+```
+
+Dado que el coeficiente más cercano a 1 es el método Ward con un 0.9913, para hacer el clustering jerárquico vamos a utilizar el método de Ward
+
+```{r}
+# Convertir la matriz de Gower a formato 'dist'
+M_dist <- as.dist(as.matrix(M_dist))
+
+# Aplicar MDS para convertir en formato euclidiano
+hc1 <- cmdscale(M_dist, k = 2)
+
+# Realizar clustering jerárquico con método Ward
+hc1 <- hclust(M_dist, method = "ward.D2")
+
+# Graficar el dendrograma
+plot(hc1, main = "Dendrograma - Clustering Jerárquico (Ward con Gower)",
+     xlab = "Observaciones", sub = "", cex = 0.6)
+```
+
+Es fácil ver que el número mas óptimo, otra vez, es de **2 clusters**. Vamos a representar el corte que habría qeu hacer para separar el dendograma en 2 grupos:
+
+```{r}
+# Cortamos en 2 clusters
+sub_grp <- cutree(hc1, k = 2)
+
+# Visualizamos el corte en el dendrograma
+plot(hc1, cex = 0.6)
+rect.hclust(hc1, k = 2, border = 2:5)
+```
+
+A continuación, vamos a explicar los grupos visualizando la media de cada grupo por cada variable.
+
+```{r}
+# Agregamos los clusters al dataframe original
+train$Cluster <- as.factor(k2$cluster)
+
+# Hacemos la media de cada variable por cluster
+cluster_means <- train %>%
+  group_by(Cluster) %>%
+  summarise(across(where(is.numeric), mean, na.rm = TRUE))
+
+# Convertimos a formato largo para graficar
+cluster_long <- pivot_longer(cluster_means, cols = -Cluster, names_to = "Variable", values_to = "Valor")
+
+# Hacemos una gráfica de barras para comparar las variables por cluster
+ggplot(cluster_long, aes(x = Variable, y = Valor, fill = Cluster)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  theme_minimal() +
+  labs(title = "Comparación de Clusters por Variable", x = "Variable", y = "Valor") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+Las conclusiones que podemos sacar de este gráfico, donde se comparan las medias es que las variables donde están las principales diferencias entre clusters para así diferenciar los grupos es el peso (Weight) y la edad (Age). Para que sea mas claro:
+
+- Grupo 1 (rojo): Es el grupo que tiene *mayor edad y mayor peso*, y, generalmente, suele superar al grupo 2 en la mayoría de las variables.
+
+- Grupo 2 (azul): Al contrario del grupo 1, es el que tiene *más personas jovenes y de menor peso que el grupo 1*.
+
+# 5. Conclusiones.
+
+Hemos analizado un conjunto de datos de obesidad de México, Perú y Colombia y así poder caracterizar los distintos niveles de obesidad según diversas variables.
+
+Utilizando varias técnicas de exploracion de datos, reduccion de dimensionalidad y aprendizaje no supervisado para realizar un análisis de los factores asociados a la obesidad en los individuos.
+
+En este análisis hemos podido identificar ciertas relaciones entre variables como el peso, altura, edad, historial familiar de sobrepeso, actividad fisica y otros factores.
+
+Las principales conclusiones que hemos podido obtener han sido:
+
+- Factores determinantes en la obesidad: Variables como el peso y la altura tienen una relacion directa con el nivel de obesidad. Y otras como los antecedentes familiares de sobrepeso tienen una mayor probabilidad de desarrollar obesidad. 
+La frecuencia de consumo de verduras, el número de comidas principales y actividad física tambien parecen influir. 
+En relación al transporte y la movilidad, se ha comprobado que personas que usan medios de transporte son más propensos a desarrollar algún tipo de obesidad frente a los que usan medios mas tradicionales como los que usan bicicleta o los que caminan.
+
+- Análisis de Componentes Principales: En esta parte hemos usado los datos de triathlon lake placid women ironman. Analizando 3 de las variables relacionadas con el rendimiento en deportes de resistencia, se ha podido reducir a dos componentes principales sin perder demasiada información para así facilitar la interpretación y la detección de patrones de rendimientos en atletas.
+
+- Aprendizaje no supervisado y clustering: A través de métodos jerárquicos y no jerárquicos, se ha conseguido identificar 2 perfiles (clusters) diferenciados en los datos, diferenciados en función de la edad y el peso
+
+En definitiva, este estudio resalta la importancia de llevar un estilo de vida saludable, evidenciando que una alimentación equilibrada, la actividad física regular y la reducción del sedentarismo son elementos fundamentales para prevenir y controlar la obesidad.
+
+Partes de la práctica realizada por cada miembro del grupo:
+- 1. Comprensión del problema: Marcos López García
+- 2. EDA: Marcos López García y Carmen Liberal Jiménez
+- 3. PCA: Carmen Liberal Jiménez
+- 4. Matriz de distancias: Marcos López García. Condiciones de métrica y clustering: Lara Montero del Prado
+- 5. Conclusión: Lara Montero del Prado
