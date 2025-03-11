@@ -112,8 +112,105 @@ str(train)
 ```
 
 # EDA
+Vamos a comenzar con nuestro Análisis Exploratorio de Datos, que ayudará a comprender la estructura, distribución y relaciones de nuestras variables con los niveles de obesidad.
 
-## Variable objetivo
+Mediante una tabla de frecuencias, vamos a observar como se distribuye cada tipo de obesidad en nuestros datos
+
+```{r}
+tabla_frecuencias <- train |> 
+  count(NObeyesdad) |> 
+  mutate(f = n/nrow(train),
+         N = cumsum(n),
+         F = cumsum(f)) 
+
+knitr::kable(tabla_frecuencias, digits = 4)
+
+```
+
+A continuación, mostramos histogramas de todas las variables continuas, aunque mas adelante analizaremos más detalladamente algunos de ellos.
+
+```{r}
+df_continuas <- train[, sapply(train, is.numeric)]
+# Histogramas de todas las variables continuas
+par(mfrow = c(3, 3))  # Diseño de subgráficos
+graficas <- lapply(names(df_continuas), function(var) {
+  hist(df_continuas[[var]], main = paste("Histograma de", var),
+       xlab = var, ylab = "Frecuencia", col = "pink")
+})
+```
+
+Calculando la estadísticas descriptivas de las variables númericas obtenemos un resumen numérico de las características de los datos:
+
+```{r}
+#Estadísticas descriptivas de las variables númericas
+df_continuas |>   
+  drop_na() |>  
+    descr() 
+```
+
+```{r}
+train |> ggplot(aes(Weight)) +
+  geom_histogram(
+    fill = "pink", 
+    bins = 15,           
+    col = "white"        
+  ) +
+  theme_bw()
+```
+
+Con la tabla de frecuencias podemos observar que el conjunto de datos tiene una distribución bastante parecida entre las categorías de obesidad, con la categoría Obesity Type l siendo la más frecuente (15.72%) y Insufficient Weight la menos frecuente (12.72%). Además, en el histograma de distribución del peso se aprecia un pico alrededor de los 80 kg, por lo que podemos intuir que las personas con Obesidad Tipo l pueden tener un peso alrededor de este valor. En general, los pesos se encuentran mayoritariamente entre los 50 y 120 kg y algún valor atípico por encima de los 160 kg.
+
+Ahora vamos a analizar algunas de nuestras variables, con el siguiente histograma mostramos la distribución de edades de nuestros datos, que nos permite visualizar la cocentración:
+
+```{r}
+train |> ggplot(aes(Age)) +
+  geom_histogram(
+    fill = "pink", 
+    bins = 15,           
+    col = "white"        
+  ) +
+  theme_bw()
+```
+
+La mayoría de personas tienen entre 15 y 30 años, con un pico en los 20 años, por lo que los datos que estamos analizando son mayoritariamente de personas jóvenes. A partir de los 30 años la frecuencia disminuye con muy pocos casos por encima de los 50 años.
+
+```{r}
+train |> ggplot(aes(Height)) +
+  geom_histogram(
+    fill = "pink", 
+    bins = 15,           
+    col = "white"        
+  ) +
+  theme_bw()
+```
+
+Este histograma muestra la distribución de alturas en la muestra, la mayoria de personas tienen una altura entre 1.60 y 1.90 metros, con un pico alrededor de los 1.75 y 1.80 metros. Esto tiene sentido, ya que teniendo en cuenta el histograma de edad, la mayoria de personas son jóvenes cuyas alturas suelen estar alrededor de estas.
+
+```{r}
+train|> 
+  ggplot(aes(x = family_history_with_overweight)) +
+  geom_bar(fill = "pink") +
+  theme_bw() + 
+  labs(title = "Historial familiar de sobrepeso", 
+       x = "family history with overweight",
+       y = "Frecuencia absoluta")
+```
+
+Muchas más personas tienen un historial familiar de sobrepeso de las que no lo tienen, intuitivamente podríamos decir que esto afecta directamente al nivel de obesidad de la persona asi que más adelante analizaremos esta variable en función de los niveles de obesidad para ver si la suposición es cierta.
+
+Los medios de transporte utilizados por las personas también pueden afectar al nivel de obesidad ya que pueden suponer más o menos actividad física, veremos la frecuencia de cada uno para más adelante analizarlos en función de los niveles de obesidad:
+
+```{r}
+train|> 
+  ggplot(aes(x = MTRANS)) +
+  geom_bar(fill = "pink") +
+  theme_bw() + 
+  labs(title = "Medio de transporte usado", 
+       x = "Medio de transporte",
+       y = "Frecuencia absoluta")
+```
+
+Ahora, nos centraremos más en el target y en ver como se relaciona con el resto de variables de distintas formas.
 
 Antes de nada vamos a mirar como se puede ver nuetra variable objetivo, que sería el nivel de obesidad que hay en esta muestra, primero vamos a ver información sobre la variable
 
@@ -154,7 +251,7 @@ ggplot(train, aes(x = FCVC, fill = NObeyesdad , colour = NObeyesdad)) +
   geom_histogram(position = "dodge", bins = 5)
 ```
 
-Podemos ver que las personas que hacen una comida son menos propensos de desrrollar obesidad de algún tipo. Por otro lado, hay una cosa que nos parece curiosa y es qe al hacer tres comidas hay bastabtes personas que han desarrollado obesidad de tipo 3 o no tienen el suficiene peso. Viendo esta tabla se puede ver que las personas hacen sobre todo 3 comidas al día.
+Podemos ver que las personas que hacen una comida son menos propensos de desarrollar obesidad de algún tipo. Por otro lado, hay una cosa que nos parece curiosa y es que al hacer tres comidas hay bastantes personas que han desarrollado obesidad de tipo 3 o no tienen el suficiene peso. Viendo esta tabla se puede ver que las personas hacen sobretodo 3 comidas al día.
 
 **Nivel de obesidad según el peso.**
 
@@ -170,7 +267,7 @@ train |>
 
 ```
 
-Como podemos observar en el BoxPlot, los niveles de obesidad estan fuertemente relacionados con el peso. Las personas con un mayor peso son las que padecen de Obesidad tipo 3, dentro de esta categoria podemos observar un valor atípico, que se sale por encima del rango, y seria la persona con mas peso entorno a 172,5 kg. La siguiente clase con mas peso son las Obesidad tipo 2, donde también hay ciertos valores atípicos que está vez están por debajo del rango. La tercera categoria con mas peso es la Obesidad tipo 1, donde encontramos al mayor número de personas si recordamos el gráfico anterior. Por último ordenadas de mayor a menor peso encontramos: Sobrepeso nivel 1, Sobrepeso nivel 2, Peso normal y Peso insuficiente.
+Como podemos observar en el BoxPlot, los niveles de obesidad estan fuertemente relacionados con el peso. Las personas con un mayor peso son las que padecen de Obesidad tipo 3, dentro de esta categoria podemos observar un valor atípico, que se sale por encima del rango, y seria la persona con mas peso entorno a 172,5 kg. La siguiente clase con mas peso son las Obesidad tipo 2, donde también hay ciertos valores atípicos que está vez están por debajo del rango. La tercera categoria con mas peso es la Obesidad tipo 1, donde encontramos al mayor número de personas si recordamos el gráfico anterior. Por último, ordenadas de mayor a menor peso encontramos: Sobrepeso nivel 1, Sobrepeso nivel 2, Peso normal y Peso insuficiente.
 
 **Boxplot de los niveles de obesidad distribuidos según la altura.**
 
@@ -226,7 +323,7 @@ ggplot(data_prop, aes(x = NObeyesdad, y = prop, fill = SMOKE)) +
 
 ```
 
-Viendo esta tabla podemos ver que si las personas fuman no tiene una relación con el nivel de obesidad. Debido a que la mayoría de las personas que fuman se encuentran en obisdad de tipo II, sin embargo el siguiente grupo en el que las personas fuman son personas de peso norma. 
+Viendo esta tabla podemos ver que si las personas fuman no tiene una relación con el nivel de obesidad. Debido a que la mayoría de las personas que fuman se encuentran en obesidad de tipo II, sin embargo el siguiente grupo en el que las personas fuman son personas de peso normal. 
 
 Como la dieta está directamente relacionada con el peso, analizaremos como ciertas variables relacionadas con la dieta afectan al peso:
 
@@ -265,7 +362,7 @@ Por tanto, podemos sacar como conclusión que el consumo de comidas con alto niv
 
 Continuaremos analizando otra variable que tiene que ver con la dieta, FCVC que es la frecuencia del consumo de vegetales. Como esta variable es continua, observaremos su distribución por nivel de obesidad de dos maneras mediante un histograma y un boxplot:
 
-Realizaremos un histograma de cada nivel de obesidad y su ditribución del consumo de vegetales para que sea mas claro, ya que al ser varios niveles en un mismo histrograma no se ve con claridad.
+Realizaremos un histograma de cada nivel de obesidad y su disatribución del consumo de vegetales para que sea mas claro, ya que al ser varios niveles en un mismo histrograma no se ve con claridad.
 
 ```{r}
 ggplot(train, aes(x = FCVC, fill = NObeyesdad)) +
