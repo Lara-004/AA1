@@ -1,7 +1,7 @@
 ---
-title: "Obesidad"
+title: "Practica1"
 author: "Marcos López García, Carmen Liberal Jiménez y Lara Montero del Prado"
-date: "`r Sys.Date()`"
+date: "2025-03-11"
 output:
   html_document:
     theme: flatly
@@ -69,7 +69,7 @@ En este dataset podemos encontrar distintos tipos de variables:
 Primero de todo, vamos a cargar los datos y vamos a ver la cantidad de variables y observaciones que encontramos.
 
 ```{r}
-obesidad <- read.csv("C:/Users/laram/Downloads/archive (3)/ObesityDataSet.csv")
+obesidad <- read.csv("ObesityDataSet.csv")
 data <- dim(obesidad)
 ```
 Podemos observar que tenemos una cantiadad de `r data[1]` observaciones y `r data[2]` variables en este dataset
@@ -645,7 +645,7 @@ El número de personas con obesidad dentro del grupo de las que no caminan es mu
 ## Con la función prcomp() de R:
 
 ```{r}
-ironman_lake_placid_female_2022 <- read_csv("C:/Users/laram/Downloads/archive (3)/ironman_lake_placid_female_2022.csv")
+ironman_lake_placid_female_2022 <- read_csv("ironman_lake_placid_female_2022.csv")
 ```
 
 Ahora trabajaremos con un conjunto de datos sobre participantes femeninas en un triatlon Ironman, las variables que utilizaremos son, Swim.Time, Run.Time y Bike.Time, mediante la función head podemos observar la estructura del conjunto de datos y sus variables:
