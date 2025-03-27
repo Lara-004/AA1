@@ -10,10 +10,21 @@ output:
       collapsed: true
 ---
 
+# 0. Datos
+
 ```{r}
+# Datos
+obesidad <- read.csv("ObesityDataSet.csv")
+
+# Cambio de algunas variables
+obesidad$Age <- round(obesidad$Age)
+obesidad$NCP <- round(obesidad$NCP)
+obesidad$FAF <- round(obesidad$FAF)
+
+# Partición de los datos
 set.seed(1)
 
-# Indices para la partición
+# Indices
 nobesidad <- dim(obesidad)[1]
 indices <- 1:nobesidad
 ntrain <- nobesidad * 0.6
@@ -38,6 +49,8 @@ val <- test_val[indices.val, ]
 
 
 # 1. Planteamiento del Problema
+
+
 
 # 2. Entrenamiento de modelos y  programación
 
