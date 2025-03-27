@@ -10,21 +10,33 @@ output:
       collapsed: true
 ---
 
-# 0. Datos
+```{r echo=FALSE}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(HDclassif)
+library(MASS)
+library(gt)
+library(knitr)
+library(cluster)
+library (tidyverse)
+library (factoextra)
+library (NbClust)
+library (parameters)
+library (stats)
+library(summarytools)
+library(corrplot)
+```
 
-```{r}
-# Datos
-obesidad <- read.csv("ObesityDataSet.csv")
+```{r echo = FALSE}
+obesidad <- read.csv("C:/Users/laram/Downloads/archive (3)/ObesityDataSet.csv")
+data <- dim(obesidad)
+```
 
-# Cambio de algunas variables
-obesidad$Age <- round(obesidad$Age)
-obesidad$NCP <- round(obesidad$NCP)
-obesidad$FAF <- round(obesidad$FAF)
-
-# Partición de los datos
+```{r echo = FALSE}
 set.seed(1)
 
-# Indices
+# Indices para la partición
 nobesidad <- dim(obesidad)[1]
 indices <- 1:nobesidad
 ntrain <- nobesidad * 0.6
@@ -45,16 +57,45 @@ indices.val <- indices[-indices.test]
 # Creamos los datos de test y val
 test <- test_val[indices.test, ]
 val <- test_val[indices.val, ]
+
+obesidad$Age <- round(obesidad$Age)
+obesidad$NCP <- round(obesidad$NCP)
+obesidad$FAF <- round(obesidad$FAF)
+
 ```
 
 
 # 1. Planteamiento del Problema
 
+Este conjunto de datos contienen la información para dar una estimación de los niveles de obesidad de personas residentes en Mexico, Perú y Colombia.
+
+En este dataset podemos encontrar distintos tipos de variables:
+
+* Gender: Genero. Variable discreta
+* Age: Edad. Variable continua
+* Height: Altura (m). Variable continua
+* Weight: Peso (kg). Variablel continua
+* family_history_with_overweight: Antecedentes familiares. Variable binaria ('yes', 'no')
+* FAVC: Consumo frecuente de alimentos de alto valor genético. Variable binaria ('yes', 'no')
+* FCVC: Frecuencia de consumo deverduras. Variable continua
+* NCP: Número de comidas principales. Variable continua
+* CAEC: Consumo de alimentos entre comidas. Variable discreta
+* CH2O: Consumo de agua diariamente. Variable continua
+* CALC: Consumo de alcohol. Variable discreta  
+* SCC: Monitoreo del consumo de calorías. Variable binaria ('yes', 'no')
+* FAF: Frecuencias de actividad física. Variable continua
+* TUE: Tiempo utilizado dispositivos electronicos. Variable continua
+* MTRANS: Transporte utilizado con frecuencia. Variable discreta
+* NObeyesdad: Grupos segun el nivel de obesidad, variable discreta se diferencian en:
+
 Dado nuestro problema, que es averiguar el nivel de obesidad de las personas según ciertas variables, buscamos crear un modelo de aprendizaje supervisado para poder averiguar de la forma más precisa el nivel de obesidad que tiene o que puede desarrollar una persona.
+
 
 # 2. Entrenamiento de modelos y  programación
 
+
 ## 2.1 Modelos
+
 
 ### k-NN
 
