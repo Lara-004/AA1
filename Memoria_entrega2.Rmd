@@ -50,7 +50,7 @@ val <- test_val[indices.val, ]
 
 # 1. Planteamiento del Problema
 
-
+Dado nuestro problema, que es averiguar el nivel de obesidad de las personas según ciertas variables, buscamos crear un modelo de aprendizaje supervisado para poder averiguar de la forma más precisa el nivel de obesidad que tiene o que puede desarrollar una persona.
 
 # 2. Entrenamiento de modelos y  programación
 
