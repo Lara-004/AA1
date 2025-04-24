@@ -99,5 +99,94 @@ Dado nuestro problema, que es averiguar el nivel de obesidad de las personas seg
 
 ### k-NN
 
+## MÉTODOS DE ENSAMBLADO
+
+Aplicando métodos de ensamblado, podemos mejorar significativamente el rendimiento de predicción, ya que se basa en la unión de múltiples modelos, comenzaremos aplicando el esamblado de bagging.
+
+#### Bagging
+
+```{r}
+library(randomForest)
+library(caret)
+
+rf <- randomForest(as.factor(NObeyesdad)~., data=train, importance=TRUE,proximity=TRUE) 
+print(rf)
+```
+
+En cada división interna del árbol, se consideran 4 variables predictoras, lo que contribuye a reducir el sobreajuste. Como podemos observar, se muestra un error OOB de tan solo el 5,45%, esto nos indica una muy buena generalización del modelo.
+
+Además, en la matriz de confusión se muestra como la gran mayoria de las clases de obesidad se clasifican con alta precisión. Todas las clases de obesidad tienen una tasa de error parecida y baja, destacan Obesidad Tipo 1, cuya tasa de error es del 0%, clasificándose correctamente en todos los casos. Por otro lado, Sobrepeso Nivel 1 es la que mayor tipo de error presenta, de un 16,86%, lo que sugiere que es el que mayores disficultades presenta a la hora de clasificar.
+
+Continuamos evaluando visualmente la convergencia del modelo, para anlizar el comportamiento del modelo según se agregan árboles al conjunto.
+
+```{r}
+plot(rf)
+```
+
+La línea continua muestra el error promedio general, y el resto de líneas discontinuas son los errores según el tipo de obesidad. Algunos errores son muy cercanos a 0, podemos deducir que el rosa (el más bajo) corresponde a Obesidad Tipo 1 ya que su error era de era del 0% y el más elevado a Sobrepeso Nivel 1, ya que su error era el más alto. El error disminuye de manera rápida en las primeras iteraciones y a partir de los 200 árboles se estabiliza, esto demuestra una buena capacidad de generalización del modelo.
+
+```{r}
+# sobre la partición de prueba
+#df.test <- train %>%
+      #dplyr::select(Gender, Age, Height, Weight, family_history_with_overweight, FAVC, FCVC, NCP, CAEC, SMOKE, SCC, FAF, TUE, CH2O, CALC, MTRANS, #NObeyesdad)
+#prediction.rf <- predict(rf, df.test,type="prob")[,2]
+#clase.pred.rf=ifelse(prediction.rf>0.5,"yes","no")
+#cf <- confusionMatrix(as.factor(clase.pred.rf), as.factor(df.test$NObeyesdad),positive="yes")
+#print(cf)
+```
+
+A continuación, identificamos las variables predictoras que más influyen en las decisiones del modelo:
+
+```{r}
+importance(rf)
+```
+
+Esta función nos muestra dos medidas clave:
+
+Mean Decrease Accuracy: Muestra cuánto disminuye la precisión del modelo excluimos cada variable.
+
+Mean Decrease Ginni: Mide la pureza de los nodos que aporta cada variable al dividir los datos.
+
+Por lo que según los resultados que hemos obtenido podemos deducir que la variable Weight es la más determinante para predecir el nivel de obesidad, ya que sus valores son los mas altos, su Mean Decrease Accuracy es de 126 y su Mean Decrease Ginni es de 389. Esto tiene total sentido, ya que el nivel de obesidad va ligado al peso y es coherente que sea la variable mas determinante para predecirlo.
+
+Junto al peso, tenemos las variables Altura y Edad, que también son de las más importantes ya que sus valores son los siguientes mas elevados, y por ello también son variables muy relevantes al predecir el nivel de obesidad. También cabe descatar la importancia de ciertas variables como family_history_with_overweight y FCVC, sus valores también son relevantes y esto nos indica que el historial familiar de obesidad y la frecuencia en el consumo de vegetales también tienen una contribución relevante en el modelo.
+
+Por el contrario, variables como SMOKE O SCC, presentan valores muy bajos e incluso negativos, lo que nos sugiere que son poco relevantes a la hora de predecir el nivel de obesidad. Lo cual concuerda con conclusiones anteriores en las que afirmamos que la variable fumar no afecta al nivel de obesidad.
+
+Evaluamos la importancia de las variables:
+
+```{r}
+varImpPlot(rf)
+```
+
+Al representar graficamente las Mean Decrease Accurancy y Mean Decrease Gini podemos observar de manera más visual como la variables más importante es el peso, lo cual tiene sentido ya que el nivel de obesidad depende del peso. En ambas métricas destacan también de manera muy notable la altura y la edad. Además la frecuencia en el consumo de verduras, el consumo de agua (CH2O) y la frecuencia del consumo de comida calórica (CAEC), también son relevantes, lo que nos puede llevar a concluir la importancia de los hábitos alimenticios en el peso. Por último y coincidencio con lo anterior SCC Y SMOKE vuelven a tener el impacto menos notable en la predicción del modelo.
+
+```{r}
+MDSplot(rf,as.factor(train$NObeyesdad),k=3)
+```
+
+### NAIVE BAYES
+
+A continuación, vamos a aplicar el método Naive Bayes que estima la clase de obesidad mas probable para cada observación asumiendo independencia entre las variables.
+
+Además, aplicamos Laplace Smoothing (laplace = 1), para evitar que algunas combinaciones de valores tengan probabilidad 0 y así no anulemos la probabilidad total de una clase.
+
+```{r}
+library(naivebayes)
+library(dplyr)
+library(caret)
+
+train$NObeyesdad <- as.factor(train$NObeyesdad)
+test$NObeyesdad <- as.factor(test$NObeyesdad)
+
+naive_model <- naive_bayes(NObeyesdad ~ ., data = train, usekernel = TRUE, laplace = 1)
+pred_classes <- predict(naive_model, newdata = test)
+
+# Matriz de confusión
+confusionMatrix(pred_classes, test$NObeyesdad)
+
+```
+
+Tras aplicarlo, obtenemos una exactitud del 72,5% y un índice Kappa de 0,6775, lo que significa que el modelo tiene una buena capacidad para predecir las clases de obesidad. De hecho, Obesidad de tipo lll, está identificada con una precisión perfecta, sin embargo las clases que peor se ajustan son Sobrepeso Nivel l con sensibilidad del 50% y Sobrepeso Nivel ll con sensibilidad del 54%. Esto tiene sentido si nos fijamos en el análisis anterior usando el método Bagging, en el cual Sobrepeso Nivel l también era la que peor se ajustaba probablemente también por un solapamiento con Sobrepeso Nivel ll.
 
 
