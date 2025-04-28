@@ -152,6 +152,83 @@ cf <- confusionMatrix(prediction, as.factor(test.df$NObeyesdad),positive="yes")
 print(cf)
 ```
 
+### Análissi Discriminante Lineal.
+
+Primero de todo, vamos a ver nuestra variable objetivo para ver si es de tipo factor, en caso de no serlo, lo transformamos.
+
+```{r}
+str(train$NObeyesdad)
+```
+
+Como es de tipo caracter, hacemos el cambio a factor
+
+```{r}
+train$NObeyesdad <- as.factor(train$NObeyesdad)
+```
+
+Ahora vamos a hacer el análisis discriminante lineal.
+
+```{r}
+# Creamos el modelo lda
+lda_modelo <- lda(NObeyesdad ~ ., data = train)
+
+# Buscamos las predicciones de lda
+lda_predicciones <- predict(lda_modelo)
+
+# Representacion del lda
+lda_train <- data.frame(Componente_1 = lda_predicciones$x[, 1], Clase = train$NObeyesdad)
+
+ggplot(lda_train, aes(x = Componente_1, y = 0, color = Clase)) +
+  geom_point(size = 3) +
+  labs(
+    title = "Proyección de LDA",
+    x = "Componente discriminante 1",
+    y = ""
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = rainbow(length(unique(lda_train$Clase))))
+```
+
+Al visualizar la proyección del LDA, podemo ver que en la parte central de las componentes discriminantes hay tipos de obesidad solapados, lo que nos puede indicar que tienen caracteríasticas similares, entre ellos se pueden ver overweight level II y obesity type I, también se puede ver como tenemos valores que están en los extremos, lo que nos puede decir que diferenciarlos de los otros grupos es más senciello. Para estudiar mejor sus diferencias, vamos a hacer un boxplot de las componenetes por clase y un violin plot.
+
+```{r}
+# Definir colores
+colores <- rainbow(length(unique(lda_train$Clase)))
+
+# Boxplot
+boxplot_lda <- ggplot(lda_train, aes(x = Clase, y = Componente_1, fill = Clase)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Boxplot de la Proyección de LDA",
+    x = "Clase",
+    y = "Componente Discriminante 1"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    legend.position = "none" # Ocultar leyenda aquí
+  ) +
+  scale_fill_manual(values = colores)
+
+# Violin Plot
+violinplot_lda <- ggplot(lda_train, aes(x = Clase, y = Componente_1, fill = Clase)) +
+  geom_violin(alpha = 0.7) +
+  labs(
+    title = "Violin Plot de la Proyección de LDA",
+    x = "Clase",
+    y = "Componente Discriminante 1"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    legend.position = "none" # Ocultar leyenda aquí también
+  ) +
+  scale_fill_manual(values = colores)
+
+# Mostrar gráficos
+grid.arrange(boxplot_lda, violinplot_lda, ncol = 2)
+```
+
 ### MÉTODOS DE ENSAMBLADO
 
 Aplicando métodos de ensamblado, podemos mejorar significativamente el rendimiento de predicción, ya que se basa en la unión de múltiples modelos, comenzaremos aplicando el esamblado de bagging.
