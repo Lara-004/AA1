@@ -99,7 +99,60 @@ Dado nuestro problema, que es averiguar el nivel de obesidad de las personas seg
 
 ### k-NN
 
-## MÉTODOS DE ENSAMBLADO
+Primero vamos a ver que variable son las necesarias apra poder hacer un buen modelo de knn. Como hemos visto en el EDA, hay ciertas variables que tiene más relación que otras, esas son height, weight, family history with overweight, gender, FAVC (Consumo de alimentos altos en calorias), FAF (Frecuencia de actividad física) y MTRANS (Medio de transporte).
+
+```{r}
+# Primero de todo, vamos a usar 10 fold cross validation y lo vamos a repetir 5 veces.
+trainControl <- trainControl(method="repeatedcv", number=10, repeats=5)
+metric <- "Accuracy"
+
+# Creamos la semilla y buscamos el mejor valor de k para tener un buen modelo.
+set.seed(1)
+
+train.df <- train |> select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+train.df[,2] <- scale(train.df[,2])
+train.df[,3] <- scale(train.df[,3])
+train.df[,6] <- scale(train.df[,6])
+
+fit.knn <- train(NObeyesdad ~ ., data=train.df, method="knn", metric=metric ,trControl=trainControl, preProcess = c("center", "scale"))
+knn.k1 <- fit.knn$bestTune 
+print(fit.knn)
+```
+Como podemos observar, el mejor valor de k que podemos obtener es de k = 5. Al mirar los resultados podemos ver que el programa ha probado con k = 5 obteniendo una precisión del 80%, aproximadamente, y un indice kappa de 0.76 aproximadamente. Conforma aumentamos el valor de k, en este caso prueba con k = 7 y k = 9, podemos ver como la precisión de nuestro modelo disminuye, al igual que el indice kappa, lo que nos da a entender que cuanto más aumentemos k partiendo de k = 5, pero va a ser nuestro modelo. A continuación vamos a verlo en tabla.
+
+```{r}
+plot(fit.knn)
+```
+
+Como vemos a partir de k = 5, la precisión de nuestro modelo desciende draticamente. Por lo que viendo el gráfico y las métricas anteriores, podemos observar que k = 5 es el mejor valor que podemos seleccionar. A continuación vamos a obtener la predicción para nuestro conjunto de datos de prueba y vamos a imprimir la matriz de confusión. 
+
+```{r}
+set.seed(1)
+
+# Primero calculamos la media de las variables que queremos estandarizar.
+# media_height <- mean(train$Height)
+# stddev_height <- sqrt(var(train$Height))
+# test.df <- test |> mutate(Height=(Height - media_height)/stddev_height)
+# 
+# media_weight <- mean(train$Weight)
+# stddev_weight <- sqrt(var(train$Weight))
+# test.df <- test |> mutate(Weight=(Weight - media_weight)/stddev_weight)
+# 
+# media_FAF <- mean(train$FAF)
+# stddev_FAF <- sqrt(var(train$FAF))
+# test.df <- test |> mutate(FAF=(FAF - media_FAF)/stddev_FAF)
+
+test.df <- test |> select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+test.df[,2] <- scale(test.df[,2])
+test.df[,3] <- scale(test.df[,3])
+test.df[,6] <- scale(test.df[,6])
+
+prediction <- predict(fit.knn,newdata=test.df)
+cf <- confusionMatrix(prediction, as.factor(test.df$NObeyesdad),positive="yes")
+print(cf)
+```
+
+### MÉTODOS DE ENSAMBLADO
 
 Aplicando métodos de ensamblado, podemos mejorar significativamente el rendimiento de predicción, ya que se basa en la unión de múltiples modelos, comenzaremos aplicando el esamblado de bagging.
 
