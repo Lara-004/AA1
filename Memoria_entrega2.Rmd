@@ -295,6 +295,80 @@ Al representar graficamente las Mean Decrease Accurancy y Mean Decrease Gini pod
 MDSplot(rf,as.factor(train$NObeyesdad),k=3)
 ```
 
+#### Boosting
+
+A diferencia del Bagging, que entrena múltiples modelos en paralelo y los promedia, boosting entrena múltiples modelos en serie, es decir, **de manera secuencial**.
+
+Haciendolo de esta manera, se da mayor peso a aquellas observaciones mal clasificadas en cada iteracción para intentar que el siguiente modelo aprenda a clasificar bien esas observaciones.
+
+Vamos a aplicar el modelo XGBoost.
+
+```{r}
+# Convertimos los datos a numéricos
+df.train <- map_df(train, function(columna) {
+  columna %>% 
+    as.factor() %>% 
+    as.numeric %>% 
+    { . - 1 }
+})
+
+datos <- list()
+datos$train <- df.train
+
+df.test <- map_df(test, function(columna) {
+  columna %>% 
+    as.factor() %>% 
+    as.numeric %>% 
+    { . - 1 }
+})
+
+datos$test <- df.test
+
+
+# Convertimos los datos al formato Dmatrix
+datos$train_mat  <- 
+  datos$train %>% 
+  dplyr::select(-NObeyesdad) %>% 
+  as.matrix() %>% 
+  xgb.DMatrix(data = ., label = datos$train$NObeyesdad)
+datos$test_mat  <- 
+  datos$test %>% 
+  dplyr::select(-NObeyesdad) %>% 
+  as.matrix() %>% 
+  xgb.DMatrix(data = ., label = datos$test$NObeyesdad)
+
+# Parámetros
+params <- list(
+  objective = "multi:softmax",  # Porque nuestra variable de NObeyesdad es multiclase
+  num_class = 7,                # Numero de clases
+  eval_metric = "mlogloss"
+)
+
+datos$modelo_01 <- xgboost(params= params, 
+                           data = datos$train_mat,  
+                           nround = 10,
+                           max_depth=2, 
+                           eta =0.3,
+                           nthread =2)
+
+xgb.plot.multi.trees(model = datos$modelo_01)
+```
+
+Vamos a explicar el árbol.
+
+La parte superior del árbol está a la izquierda y la parte inferior a la derecha. Los números que salen al lado de cada variable es la calidad, la importancia de esa característica en el árbol.
+
+Entonces, es muy fácil ver que la característica más importante de todas es con diferencia, Weight, el peso de cada individuo.
+
+
+```{r}
+importance_matrix <- xgb.importance(model = datos$modelo_01)
+
+xgb.plot.importance(importance_matrix)
+```
+
+Gracias a este histograma, observamos que las características más importantes en orden de mayor a menor importancia son el peso, el género, la frecuencia de consumo de verduras, la altura y la edad, pero principalmente el peso del indivuduo, como era de esperar puesto que está muy relacionada con la variable NObeyesdad, que es la variable que tenemos que predecir.
+
 ### NAIVE BAYES
 
 A continuación, vamos a aplicar el método Naive Bayes que estima la clase de obesidad mas probable para cada observación asumiendo independencia entre las variables.
