@@ -1,6 +1,6 @@
 ---
 title: "Memoria_Practica2"
-author: "Lara"
+author: "Carmen Liberal, Marcos López, Lara Montero"
 date: "`r Sys.Date()`"
 output:
   html_document:
@@ -26,6 +26,9 @@ library (parameters)
 library (stats)
 library(summarytools)
 library(corrplot)
+library(rpart)
+library(rpart.plot)
+library(caret)
 ```
 
 ```{r echo = FALSE}
@@ -152,7 +155,7 @@ cf <- confusionMatrix(prediction, as.factor(test.df$NObeyesdad),positive="yes")
 print(cf)
 ```
 
-### Análissi Discriminante Lineal.
+### Análisis Discriminante Lineal.
 
 Primero de todo, vamos a ver nuestra variable objetivo para ver si es de tipo factor, en caso de no serlo, lo transformamos.
 
@@ -228,6 +231,49 @@ violinplot_lda <- ggplot(lda_train, aes(x = Clase, y = Componente_1, fill = Clas
 # Mostrar gráficos
 grid.arrange(boxplot_lda, violinplot_lda, ncol = 2)
 ```
+
+### Árboles de decisión
+
+Este método es bastante fácil de interpretar, maneja tanto datos numéricos como categóricos, es bastante efectivo cuando las relaciones entre las variables no son lineales y nos ayuda a entender como cada característica afecta las decisiones del modelo, aunque puede acabar sobreajustando. 
+
+En resumen, es un buen método de aprendizaje no supervisado para nuestro conjunto de datos.
+
+```{r}
+set.seed(1)
+df <- train %>%
+      dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+fit.dt <- rpart(NObeyesdad~., data = df, method = 'class', control = rpart.control(maxdepth = 3))
+rpart.plot(fit.dt, 
+           extra = 106,
+           cex = 0.6,
+           type = 2,                      
+           box.palette = "RdYlBu",
+           shadow.col = "gray",
+           main = "Árbol de Decisión",
+           box.col = "lightblue",
+           faclen = 2)
+```
+
+Hemos reducido la profundidad y por tanto la compliejidad del modelo y aumentada la explicabilidad.
+
+Vamos a explicar el diagrama de arbol desde el nodo raíz hasta los nodos hoja:
+
+El árbol empieza en el nodo raíz separando en 2 nodos dependiendo de la condición de si el peso es mayor de 100 (Obesidad tipo 3) o menor de 100 (peso normal), representando cada nodo el 33% y el 66% de los datos de entrenamiento respectivamente.
+
+- Rama izquierda(67%): hay un 38% de probabilidad de que tengan peso insuficiente (y dentro de ese tipo, si la altura es menor de 1.70cm, hay una probabilidad de 53% que representan un 14% de los individuos con peso normal) y un 17% de que tengan algun tipo de sobrepeso (39% de sobrepeso nivel 1 y un 3% de sobrepeso nivel 2, representando el 17% y el 29% de los individuos de nuestro conjunto de datos de entrenamiento respectivamente)
+
+- Rama derecha: Si el individuo es hombre, el árbol predice que tiene obesidad tipo 3 representando el 15% de los datos. Si no es hombre, se evalúa la condición de si pesa mas de 110 kg (obesidad tipo 2) o menos de 110 kg (obesidad tipo 1) representando el 12% y el 6% de los datos de entrenamiento.
+
+En la rama derecha podemos ver que las probabilidades son de 0. Esto nos dice que hay un porcentaje muy bajo de individuos en nuestros datos que tienen algún tipo de obesidad.
+
+```{r}
+prediction <- predict(fit.dt, train, type = 'class')
+cf <- confusionMatrix(prediction, as.factor(train$NObeyesdad),positive="yes")
+print(cf)
+```
+
+Con la matriz de confusión podemos determinar que el método de árboles de decisión es muy buena, acertando en la mayoría de los casos el tipo de obesidad de los individuos y obteniendo un valor cercano a 1 en Pos Pred Value, Neg Pred Value, Specificity, Sensitivity y Balanced Accuracy en las estadísticas por clase.
+
 
 ### MÉTODOS DE ENSAMBLADO
 
