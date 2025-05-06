@@ -29,6 +29,7 @@ library(corrplot)
 library(rpart)
 library(rpart.plot)
 library(caret)
+library(randomForest)
 ```
 
 ```{r echo = FALSE}
@@ -414,6 +415,63 @@ xgb.plot.importance(importance_matrix)
 ```
 
 Gracias a este histograma, observamos que las características más importantes en orden de mayor a menor importancia son el peso, el género, la frecuencia de consumo de verduras, la altura y la edad, pero principalmente el peso del indivuduo, como era de esperar puesto que está muy relacionada con la variable NObeyesdad, que es la variable que tenemos que predecir.
+
+### Random Forest
+
+Es una técnica de ensamblado que mejora la precisión de las predicciones. Se construye un bosque formado por varios árboles de decisión individuales no necesariamente correlacionados. Vamos a explicar un poco como funciona el algorítmo:
+
+1. Iniciación: Definir los parámetros (número de árboles, tamaño de los nodos, etc)
+
+2. Creación de cada árbol: Tomar una muestra bootstrap de tamaño n del conjunto de entrenamiento y crear un árbol usando esa muestra.
+  - Selección de variables: seleccionar un pequeño conjunto de las variables.
+  - Cálculo de la mejor división: para las variables seleccionadas, escoger la mejor variable y la mejor división.
+  - División del nodo: Dividir el nodo en 2 nodos hijos en función de la variable seleccionada y la mejor división.
+  - Recursión: Repetir el proceso de división recursivamente para cada nodo hijo hasta que se alcance un criterio de detención.
+ 
+3. Output y división: devolver el ensamblado de árboles para hacer una predicción total
+
+```{r}
+set.seed(9)
+rf <- randomForest(as.factor(NObeyesdad)~., data=train, importance=TRUE,proximity=TRUE) 
+plot (rf)
+legend("topright", 
+       legend = colnames(rf$err.rate), 
+       col = 1:ncol(rf$err.rate), 
+       lty = 1, 
+       cex = 0.8)
+```
+
+Vamos a ver paso a paso el gráfico que nos devuelve la funcion randomForest.
+
+Nos demuestra el error frente al número de arboles durante la creación de los árboles desde 0 hasta 500. Cada linea discontinua representa cada valor (Insufficient_Weight, Normal_Weight, etc) y, la línea continua en negro representa el error medio.
+
+Como era de esperar, al principio tiene un error muy alto que luego se va suavizando, pero una de ellas, Overweight_Level_II parece ser que su error no baja. Esto nos da a entender que es la variable más problematica para predecir y que no es fácil para el algoritmo prodecir su valor.
+
+```{r}
+# sobre la partición de prueba
+df.test <- test %>%
+      dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad, Age, FCVC, NCP, CAEC, SMOKE, CH2O, SCC, TUE, CALC)
+#df.test$NObeyesdad=as.factor(df.test$NObeyesdad)
+prediction.rf <- predict(rf, df.test)
+#clase.pred.rf=ifelse(prediction.rf>0.5)
+cf <- confusionMatrix(as.factor(prediction.rf), as.factor(df.test$NObeyesdad))
+print(cf)
+```
+
+Vamos a ver la matriz de confusión. 
+
+Parece ser que tiene una muy buena capacidad de predicción, con un valor de Accuracy de 0.93 y un valor de Kappa de 0.92, es decir, muy buena capacidad de predicción
+
+Vamos a visualizar ahora las variables que tienen más importancia dentro de nuestro modelo
+
+```{r}
+varImpPlot(rf)
+```
+
+Parece ser que la más importante es Weigth, la variable de peso del individuo que supera a simple vista todas las variables. Y detrás le siguen Height, la altura y Age, la edad
+
+Esto es llamativo ya que en muchos de los modelos anteriormente usados concueran en que para predecir, la variable con más peso en la mayoría de los modelos es Weigth, principalmente.
+
 
 ### NAIVE BAYES
 
