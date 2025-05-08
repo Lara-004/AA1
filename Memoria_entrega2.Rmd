@@ -30,6 +30,8 @@ library(rpart)
 library(rpart.plot)
 library(caret)
 library(randomForest)
+library(gridExtra)
+library(xgboost)
 ```
 
 ```{r echo = FALSE}
@@ -113,7 +115,7 @@ metric <- "Accuracy"
 # Creamos la semilla y buscamos el mejor valor de k para tener un buen modelo.
 set.seed(1)
 
-train.df <- train |> select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+train.df <- train |> dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
 train.df[,2] <- scale(train.df[,2])
 train.df[,3] <- scale(train.df[,3])
 train.df[,6] <- scale(train.df[,6])
@@ -377,12 +379,12 @@ datos$train_mat  <-
   datos$train %>% 
   dplyr::select(-NObeyesdad) %>% 
   as.matrix() %>% 
-  xgb.DMatrix(data = ., label = datos$train$NObeyesdad)
+  xgboost::xgb.DMatrix(data = ., label = datos$train$NObeyesdad)
 datos$test_mat  <- 
   datos$test %>% 
   dplyr::select(-NObeyesdad) %>% 
   as.matrix() %>% 
-  xgb.DMatrix(data = ., label = datos$test$NObeyesdad)
+  xgboost::xgb.DMatrix(data = ., label = datos$test$NObeyesdad)
 
 # Parámetros
 params <- list(
