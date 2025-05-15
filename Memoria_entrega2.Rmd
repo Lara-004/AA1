@@ -418,6 +418,135 @@ xgb.plot.importance(importance_matrix)
 
 Gracias a este histograma, observamos que las características más importantes en orden de mayor a menor importancia son el peso, el género, la frecuencia de consumo de verduras, la altura y la edad, pero principalmente el peso del indivuduo, como era de esperar puesto que está muy relacionada con la variable NObeyesdad, que es la variable que tenemos que predecir.
 
+```{r}
+preds <- predict(datos$modelo_01, datos$test_mat)
+accuracy <- mean(preds == datos$test$NObeyesdad)
+
+cat(sprintf("Accuracy en test: %.2f%%\n", accuracy * 100))
+```
+
+Finalmente, el rendimiento de este modelo de Boosting es de 16% aproximadamente, lo que no nos es un modelo útil para nuestro conjunto de datos.
+
+
+##### Implementación de Boosting (versión Adaboost) 
+
+Primero vamos a explicar los pasos:
+
+1. Inicializamos los pesos de las observaciones:
+
+$$
+w_i=1/n, i=1,\dots,n
+$$
+
+2. Bucle para $m = 1,...,M$. Para cada iteración $m$ realizamos los siguientes pasos:
+
+  - Ajustamos el clasificador $f_m(x)$ al conjunto de entrenamiento usando los pesos $w_i$. Este clasificador $f_m(x, \phi_m)$ es un modelo base que depende de los parámetros $\phi_m$
+  - Calcular el error ponderado de $f_m(x)$ (este error nos indica lo bien o mal que está funcionando el clasificador): 
+  
+$$
+error_{m}=\frac{\sum_{i=1}^{n}w_i I(y_i \neq f_{m}(\mathbf{x}_i))}{\sum_{i=1}^{n}w_i},
+$$
+
+  donde $I(y_i \neq f_{m}(\mathbf{x}_i))$ es la función indicadora donde toma valor 1 si la predicción es incorrecta y 0 en caso contrario.
+  - Una vez con el error, calculamos el coeficiente $\alpha_m$, que mide la importancia del clasificador en la actualización del modelo acumulado.
+  
+$$
+\alpha_m = log\left(\frac{1-error_m}{error_m} \right)
+$$
+
+  - Actualizar los pesos de las observaciones; por cada observación mal clasificada, le asignamos un aumento de peso. Con esto conseguimos que el siguiente clasificador se enfoque más en estas observaciones. Los nuevos pesos $w_i^{(m+1)}$ se calculan de la siguiente forma:
+
+$$
+w_i^{(m+1)} =w_i^{(m)} exp(\alpha_m I(y_i \neq f_{m}(\mathbf{x}_i))), i=1,\dots, n,
+$$
+    donde $y_i$ es la observación real y $exp(\alpha_m I(y_i \neq f_{m}(\mathbf{x}_i)))$ aumenta el peso de las observaciones mal clasificadas.
+  
+  - Por último, el modelo final $F(x)$ es la combinación de los clasificadores base ajustados en cada interación ponderados por $\alpha_m$, es decir:
+  
+$$
+F(\mathbf{x})=sign\left( \sum_{m=1}^{M} \alpha_{m} f_{m}(\mathbf{x})\right)
+$$
+
+Ahora que tenemos las fórmulas y entendemos el procedimiento, vamos a implementarlo a mano.
+
+```{r}
+train$y    <- as.numeric(as.factor(train$NObeyesdad)) - 1
+test$y     <- as.numeric(factor(test$NObeyesdad, 
+                                levels = levels(as.factor(train$NObeyesdad)))) - 1
+levels_lbl <- levels(as.factor(train$NObeyesdad))
+K          <- length(levels_lbl)
+
+pred_cols <- setdiff(names(train), c("NObeyesdad", "y"))
+train[pred_cols] <- lapply(train[pred_cols], function(z) 
+  if(is.numeric(z)) z else as.numeric(as.factor(z)))
+test[pred_cols]  <- lapply(test[pred_cols], function(z) 
+  if(is.numeric(z)) z else as.numeric(as.factor(z)))
+
+df_train <- as.data.frame(train[pred_cols])
+df_train$y <- factor(train$y, levels = 0:(K-1))
+df_test  <- as.data.frame(test[pred_cols])
+
+adaboost_train_rpart <- function(df, M = 10) {
+  n      <- nrow(df)
+  w      <- rep(1/n, n)
+  stumps <- vector("list", M)
+  alphas <- numeric(M)
+  K      <- length(levels(df$y))
+  
+  for (m in seq_len(M)) {
+    stump <- rpart(y ~ ., data = df, weights = w,
+                   control = rpart.control(maxdepth = 1, cp = 0, minsplit = 2))
+    pred_factor <- predict(stump, df, type = "class")
+    pred_num    <- as.numeric(pred_factor) - 1
+    y_num       <- as.numeric(df$y) - 1
+    
+    # Error ponderado
+    err <- sum(w * (pred_num != y_num))
+    err <- pmin(pmax(err, 1e-10), 1 - 1e-10)
+    
+    # Coeficiente alpha 
+    alphas[m] <- log((1 - err) / err) + log(K - 1)
+    
+    # Actualizar pesos
+    w <- w * exp(alphas[m] * (pred_num != y_num))
+    w <- w / sum(w)
+    
+    stumps[[m]] <- stump
+  }
+  
+  list(stumps = stumps, alphas = alphas, K = K)
+}
+
+# 4) Función de predicción
+adaboost_predict_rpart <- function(model, df) {
+  M      <- length(model$alphas)
+  n      <- nrow(df)
+  scores <- matrix(0, n, model$K)
+  
+  for (m in seq_len(M)) {
+    pred_factor <- predict(model$stumps[[m]], df, type = "class")
+    pred_num    <- as.numeric(pred_factor) - 1
+    for (k in 0:(model$K - 1)) {
+      scores[, k+1] <- scores[, k+1] + model$alphas[m] * (pred_num == k)
+    }
+  }
+  apply(scores, 1, which.max) - 1
+}
+
+# 5) Medir tiempo, entrenar y evaluar
+time_taken <- system.time({
+  model_ab <- adaboost_train_rpart(df_train, M = 10)
+})
+cat(sprintf("Tiempo: %.2f s\n", time_taken[3]))
+
+preds    <- adaboost_predict_rpart(model_ab, df_test)
+accuracy <- mean(preds == test$y) * 100
+cat(sprintf("Accuracy en test: %.2f%%\n", accuracy))
+```
+
+En conclusión, el algoritmo implementado es mucho más eficiente (número de Accuracy de 40% aproximadamente) ya que las iteraciones y bucles son controladas, el propio algoritmo está personalizado a nuestro caso concreto y hemos ajustado los parámetros para nuestro ejemplo concreto.
+
+
 ### Random Forest
 
 Es una técnica de ensamblado que mejora la precisión de las predicciones. Se construye un bosque formado por varios árboles de decisión individuales no necesariamente correlacionados. Vamos a explicar un poco como funciona el algorítmo:
