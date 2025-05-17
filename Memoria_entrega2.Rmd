@@ -1,5 +1,5 @@
 ---
-title: "Memoria_Practica2"
+title: "Practica 2"
 author: "Carmen Liberal, Marcos López, Lara Montero"
 date: "`r Sys.Date()`"
 output:
@@ -10,28 +10,29 @@ output:
       collapsed: true
 ---
 
-```{r echo=FALSE}
-library(readr)
-library(ggplot2)
-library(dplyr)
-library(HDclassif)
-library(MASS)
-library(gt)
-library(knitr)
-library(cluster)
-library (tidyverse)
-library (factoextra)
-library (NbClust)
-library (parameters)
-library (stats)
-library(summarytools)
-library(corrplot)
-library(rpart)
-library(rpart.plot)
-library(caret)
-library(randomForest)
-library(gridExtra)
-library(xgboost)
+```{r echo=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(HDclassif))
+suppressPackageStartupMessages(library(MASS))
+suppressPackageStartupMessages(library(gt))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(cluster))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(factoextra))
+suppressPackageStartupMessages(library (NbClust))
+suppressPackageStartupMessages(library (parameters))
+suppressPackageStartupMessages(library (stats))
+suppressPackageStartupMessages(library(summarytools))
+suppressPackageStartupMessages(library(corrplot))
+suppressPackageStartupMessages(library(rpart))
+suppressPackageStartupMessages(library(rpart.plot))
+suppressPackageStartupMessages(library(caret))
+suppressPackageStartupMessages(library(randomForest))
+suppressPackageStartupMessages(library(gridExtra))
+suppressPackageStartupMessages(library(xgboost))
+suppressPackageStartupMessages(library(naivebayes))
 ```
 
 ```{r echo = FALSE}
@@ -97,7 +98,7 @@ En este dataset podemos encontrar distintos tipos de variables:
 Dado nuestro problema, que es averiguar el nivel de obesidad de las personas según ciertas variables, buscamos crear un modelo de aprendizaje supervisado para poder averiguar de la forma más precisa el nivel de obesidad que tiene o que puede desarrollar una persona.
 
 
-# 2. Entrenamiento de modelos y  programación
+# 2. Entrenamiento de modelos y programación
 
 
 ## 2.1 Modelos
@@ -105,7 +106,7 @@ Dado nuestro problema, que es averiguar el nivel de obesidad de las personas seg
 
 ### k-NN
 
-Primero vamos a ver que variable son las necesarias apra poder hacer un buen modelo de knn. Como hemos visto en el EDA, hay ciertas variables que tiene más relación que otras, esas son height, weight, family history with overweight, gender, FAVC (Consumo de alimentos altos en calorias), FAF (Frecuencia de actividad física) y MTRANS (Medio de transporte).
+Primero vamos a ver que variable son las necesarias para poder hacer un buen modelo de knn. Como hemos visto en el EDA, hay ciertas variables que tiene más relación que otras, esas son height, weight, family history with overweight, gender, FAVC (Consumo de alimentos altos en calorias), FAF (Frecuencia de actividad física) y MTRANS (Medio de transporte).
 
 ```{r}
 # Primero de todo, vamos a usar 10 fold cross validation y lo vamos a repetir 5 veces.
@@ -148,7 +149,7 @@ set.seed(1)
 # stddev_FAF <- sqrt(var(train$FAF))
 # test.df <- test |> mutate(FAF=(FAF - media_FAF)/stddev_FAF)
 
-test.df <- test |> select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+test.df <- test |> dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
 test.df[,2] <- scale(test.df[,2])
 test.df[,3] <- scale(test.df[,3])
 test.df[,6] <- scale(test.df[,6])
@@ -278,16 +279,13 @@ print(cf)
 Con la matriz de confusión podemos determinar que el método de árboles de decisión es muy buena, acertando en la mayoría de los casos el tipo de obesidad de los individuos y obteniendo un valor cercano a 1 en Pos Pred Value, Neg Pred Value, Specificity, Sensitivity y Balanced Accuracy en las estadísticas por clase.
 
 
-### MÉTODOS DE ENSAMBLADO
+### Métodos de Ensamblado
 
 Aplicando métodos de ensamblado, podemos mejorar significativamente el rendimiento de predicción, ya que se basa en la unión de múltiples modelos, comenzaremos aplicando el esamblado de bagging.
 
 #### Bagging
 
 ```{r}
-library(randomForest)
-library(caret)
-
 rf <- randomForest(as.factor(NObeyesdad)~., data=train, importance=TRUE,proximity=TRUE) 
 print(rf)
 ```
@@ -428,136 +426,9 @@ cat(sprintf("Accuracy en test: %.2f%%\n", accuracy * 100))
 Finalmente, el rendimiento de este modelo de Boosting es de 16% aproximadamente, lo que no nos es un modelo útil para nuestro conjunto de datos.
 
 
-##### Implementación de Boosting (versión Adaboost) 
-
-Primero vamos a explicar los pasos:
-
-1. Inicializamos los pesos de las observaciones:
-
-$$
-w_i=1/n, i=1,\dots,n
-$$
-
-2. Bucle para $m = 1,...,M$. Para cada iteración $m$ realizamos los siguientes pasos:
-
-  - Ajustamos el clasificador $f_m(x)$ al conjunto de entrenamiento usando los pesos $w_i$. Este clasificador $f_m(x, \phi_m)$ es un modelo base que depende de los parámetros $\phi_m$
-  - Calcular el error ponderado de $f_m(x)$ (este error nos indica lo bien o mal que está funcionando el clasificador): 
-  
-$$
-error_{m}=\frac{\sum_{i=1}^{n}w_i I(y_i \neq f_{m}(\mathbf{x}_i))}{\sum_{i=1}^{n}w_i},
-$$
-
-  donde $I(y_i \neq f_{m}(\mathbf{x}_i))$ es la función indicadora donde toma valor 1 si la predicción es incorrecta y 0 en caso contrario.
-  - Una vez con el error, calculamos el coeficiente $\alpha_m$, que mide la importancia del clasificador en la actualización del modelo acumulado.
-  
-$$
-\alpha_m = log\left(\frac{1-error_m}{error_m} \right)
-$$
-
-  - Actualizar los pesos de las observaciones; por cada observación mal clasificada, le asignamos un aumento de peso. Con esto conseguimos que el siguiente clasificador se enfoque más en estas observaciones. Los nuevos pesos $w_i^{(m+1)}$ se calculan de la siguiente forma:
-
-$$
-w_i^{(m+1)} =w_i^{(m)} exp(\alpha_m I(y_i \neq f_{m}(\mathbf{x}_i))), i=1,\dots, n,
-$$
-    donde $y_i$ es la observación real y $exp(\alpha_m I(y_i \neq f_{m}(\mathbf{x}_i)))$ aumenta el peso de las observaciones mal clasificadas.
-  
-  - Por último, el modelo final $F(x)$ es la combinación de los clasificadores base ajustados en cada interación ponderados por $\alpha_m$, es decir:
-  
-$$
-F(\mathbf{x})=sign\left( \sum_{m=1}^{M} \alpha_{m} f_{m}(\mathbf{x})\right)
-$$
-
-Ahora que tenemos las fórmulas y entendemos el procedimiento, vamos a implementarlo a mano.
+En conclusión, los resultados obtenidos del algoritmo implementado es mucho más eficiente (valor de Accuracy de 40% aproximadamente) ya que las iteraciones y bucles son controladas, el propio algoritmo está personalizado a nuestro caso concreto y hemos ajustado los parámetros para nuestro ejemplo concreto.
 
 
-```{r}
-copy_train <- train
-copy_test <- test
-copy_train$y <- as.numeric(as.factor(copy_train$NObeyesdad)) - 1
-copy_test$y <- as.numeric(factor(copy_test$NObeyesdad, levels = levels(as.factor(copy_train$NObeyesdad)))) - 1
-
-# Número de clases
-levels_lbl <- levels(as.factor(copy_train$NObeyesdad))
-K <- length(levels_lbl)
-
-# Pasar de factores a numéricos
-tabla_preds <- setdiff(names(copy_train), c("NObeyesdad", "y"))
-copy_train[tabla_preds] <- lapply(copy_train[tabla_preds], function(z) if(is.numeric(z)) z else as.numeric(as.factor(z)))
-copy_test[tabla_preds]<- lapply(copy_test[tabla_preds],  function(z) if(is.numeric(z)) z else as.numeric(as.factor(z)))
-
-df_train <- copy_train[c(tabla_preds, "y")]
-df_train$y <- factor(df_train$y, levels = 0:(K-1))
-df_test <- copy_test[tabla_preds]
-
-# Función AdaBoost
-adaboost_train_rpart <- function(df, M) {
-  n <- nrow(df)
-  w <- rep(1/n, n)
-  stumps <- vector("list", M)
-  alphas <- numeric(M)
-  K <- length(levels(df$y))
-  
-  for (m in seq_len(M)) {
-    stump <- rpart(y ~ ., data = df, weights = w, control = rpart.control(maxdepth = 1, cp = 0, minsplit = 2))
-    pred_factor <- predict(stump, df, type = "class")
-    pred_num <- as.numeric(pred_factor) - 1
-    y_num <- as.numeric(df$y) - 1
-    
-    # Error ponderado
-    err <- sum(w * (pred_num != y_num))
-    err <- pmin(pmax(err, 1e-10), 1 - 1e-10)
-    
-    # Coeficiente alpha
-    alphas[m] <- log((1 - err)/err) + log(K - 1)
-    
-    # Actualizar pesos
-    w <- w * exp(alphas[m] * (pred_num != y_num))
-    w <- w / sum(w)
-    
-    stumps[[m]] <- stump
-  }
-  list(stumps = stumps, alphas = alphas, K = K)
-}
-
-# Función de predicción
-adaboost_predict_rpart <- function(model, df) {
-  M <- length(model$alphas)
-  n <- nrow(df)
-  scores <- matrix(0, n, model$K)
-  
-  for (m in seq_len(M)) {
-    pred_factor <- predict(model$stumps[[m]], df, type = "class")
-    pred_num <- as.numeric(pred_factor) - 1
-    for (k in 0:(model$K - 1)) {scores[, k+1] <- scores[, k+1] + model$alphas[m] * (pred_num == k)}
-  }
-  
-  apply(scores, 1, which.max) - 1
-}
-
-# Tiempo
-time_taken <- system.time({model_ab <- adaboost_train_rpart(df_train, M = 10)})
-cat(sprintf("Tiempo de entrenamiento: %.2f s\n", time_taken[3]))
-
-# Predicciones y accuracy
-datos_pred <- df_test
-preds <- adaboost_predict_rpart(model_ab, datos_pred)
-accuracy <- mean(preds == copy_test$y) * 100
-cat(sprintf("Accuracy en test: %.2f%%\n", accuracy))
-```
-
-Pasos del algoritmo:
-
-1. Inicializar los pesos $w_i = 1/n$.
-2. Para $m = 1, ..., M$ : 
-- Entrenamos un árbol de decisión de profundidad 1 (stump) con los pesos $w$.
-- Calculamos el error ponderado.
-- fijamos el coeficiente $\alpha_m$.
-- Actualizamos y normalizamos los pesos.
-3. Predicciones: para cada clase k, se suman los $\alpha_m$ de los arboles  que predicen k  y escogemos  la clase  con mayor suma.
-
-En el código, la función `adaboost_train_rpart()` hacemos los bucles, pesos y se guardan los árboles y valores de alpha, mientras que `adaboost_predict_rpart()` es la que elige la clase "ganadora".
-
-En conclusión, los resultados obtenidos del algoritmo implementado es mucho más eficiente (número de Accuracy de 40% aproximadamente) ya que las iteraciones y bucles son controladas, el propio algoritmo está personalizado a nuestro caso concreto y hemos ajustado los parámetros para nuestro ejemplo concreto.
 ### Random Forest
 
 Es una técnica de ensamblado que mejora la precisión de las predicciones. Se construye un bosque formado por varios árboles de decisión individuales no necesariamente correlacionados. Vamos a explicar un poco como funciona el algorítmo:
@@ -573,7 +444,6 @@ Es una técnica de ensamblado que mejora la precisión de las predicciones. Se c
 3. Output y división: devolver el ensamblado de árboles para hacer una predicción total
 
 ```{r}
-set.seed(9)
 rf <- randomForest(as.factor(NObeyesdad)~., data=train, importance=TRUE,proximity=TRUE) 
 plot (rf)
 legend("topright", 
@@ -615,17 +485,15 @@ Parece ser que la más importante es Weigth, la variable de peso del individuo q
 Esto es llamativo ya que en muchos de los modelos anteriormente usados concueran en que para predecir, la variable con más peso en la mayoría de los modelos es Weigth, principalmente.
 
 
-### NAIVE BAYES
+
+
+### Naive Bayes
 
 A continuación, vamos a aplicar el método Naive Bayes que estima la clase de obesidad mas probable para cada observación asumiendo independencia entre las variables.
 
 Además, aplicamos Laplace Smoothing (laplace = 1), para evitar que algunas combinaciones de valores tengan probabilidad 0 y así no anulemos la probabilidad total de una clase.
 
 ```{r}
-library(naivebayes)
-library(dplyr)
-library(caret)
-
 train$NObeyesdad <- as.factor(train$NObeyesdad)
 test$NObeyesdad <- as.factor(test$NObeyesdad)
 
