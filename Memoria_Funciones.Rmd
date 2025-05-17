@@ -1,0 +1,228 @@
+---
+title: "Funciones"
+author: "Carmen Liberal, Marcos López, Lara Montero"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: flatly
+    toc: yes
+    toc_float:
+      collapsed: true
+---
+
+```{r echo=FALSE, warning=FALSE}
+suppressPackageStartupMessages(library(readr))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(HDclassif))
+suppressPackageStartupMessages(library(MASS))
+suppressPackageStartupMessages(library(gt))
+suppressPackageStartupMessages(library(knitr))
+suppressPackageStartupMessages(library(cluster))
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(factoextra))
+suppressPackageStartupMessages(library (NbClust))
+suppressPackageStartupMessages(library (parameters))
+suppressPackageStartupMessages(library (stats))
+suppressPackageStartupMessages(library(summarytools))
+suppressPackageStartupMessages(library(corrplot))
+suppressPackageStartupMessages(library(rpart))
+suppressPackageStartupMessages(library(rpart.plot))
+suppressPackageStartupMessages(library(caret))
+suppressPackageStartupMessages(library(randomForest))
+suppressPackageStartupMessages(library(gridExtra))
+suppressPackageStartupMessages(library(xgboost))
+suppressPackageStartupMessages(library(naivebayes))
+```
+
+```{r echo = FALSE}
+obesidad <- read.csv("C:/Users/laram/Downloads/archive (3)/ObesityDataSet.csv")
+data <- dim(obesidad)
+```
+
+```{r echo = FALSE}
+set.seed(1)
+
+# Indices para la partición
+nobesidad <- dim(obesidad)[1]
+indices <- 1:nobesidad
+ntrain <- nobesidad * 0.6
+indices.train <- sample(indices, ntrain, replace = FALSE)
+indices.test_val <- indices[-indices.train]
+
+# Usamos el 60% para las variables de entrenamiento
+train <- obesidad[indices.train, ]
+test_val <- obesidad[indices.test_val, ]
+
+# Creamos los indices para test y para val
+ntest_val <- dim(test_val)[1]
+indices = 1:ntest_val
+ntest <-  ntest_val * 0.5
+indices.test <- sample(indices, ntest, replace = FALSE)
+indices.val <- indices[-indices.test]
+
+# Creamos los datos de test y val
+test <- test_val[indices.test, ]
+val <- test_val[indices.val, ]
+
+obesidad$Age <- round(obesidad$Age)
+obesidad$NCP <- round(obesidad$NCP)
+obesidad$FAF <- round(obesidad$FAF)
+
+```
+
+# k-NN
+
+# Análisis Discriminante Lineal.
+
+# Bagging
+
+
+
+
+
+
+
+
+
+
+# Implementación de Boosting (versión Adaboost) 
+
+Primero vamos a explicar los pasos:
+
+1. Inicializamos los pesos de las observaciones:
+
+$$
+w_i=1/n, i=1,\dots,n
+$$
+
+2. Bucle para $m = 1,...,M$. Para cada iteración $m$ realizamos los siguientes pasos:
+
+  - Ajustamos el clasificador $f_m(x)$ al conjunto de entrenamiento usando los pesos $w_i$. Este clasificador $f_m(x, \phi_m)$ es un modelo base que depende de los parámetros $\phi_m$
+  - Calcular el error ponderado de $f_m(x)$ (este error nos indica lo bien o mal que está funcionando el clasificador): 
+  
+$$
+error_{m}=\frac{\sum_{i=1}^{n}w_i I(y_i \neq f_{m}(\mathbf{x}_i))}{\sum_{i=1}^{n}w_i},
+$$
+
+  donde $I(y_i \neq f_{m}(\mathbf{x}_i))$ es la función indicadora donde toma valor 1 si la predicción es incorrecta y 0 en caso contrario.
+  - Una vez con el error, calculamos el coeficiente $\alpha_m$, que mide la importancia del clasificador en la actualización del modelo acumulado.
+  
+$$
+\alpha_m = log\left(\frac{1-error_m}{error_m} \right)
+$$
+
+  - Actualizar los pesos de las observaciones; por cada observación mal clasificada, le asignamos un aumento de peso. Con esto conseguimos que el siguiente clasificador se enfoque más en estas observaciones. Los nuevos pesos $w_i^{(m+1)}$ se calculan de la siguiente forma:
+
+$$
+w_i^{(m+1)} =w_i^{(m)} exp(\alpha_m I(y_i \neq f_{m}(\mathbf{x}_i))), i=1,\dots, n,
+$$
+    donde $y_i$ es la observación real y $exp(\alpha_m I(y_i \neq f_{m}(\mathbf{x}_i)))$ aumenta el peso de las observaciones mal clasificadas.
+  
+  - Por último, el modelo final $F(x)$ es la combinación de los clasificadores base ajustados en cada interación ponderados por $\alpha_m$, es decir:
+  
+$$
+F(\mathbf{x})=sign\left( \sum_{m=1}^{M} \alpha_{m} f_{m}(\mathbf{x})\right)
+$$
+
+Ahora que tenemos las fórmulas y entendemos el procedimiento, vamos a implementarlo a mano.
+
+
+```{r}
+copy_train <- train
+copy_test <- test
+copy_train$y <- as.numeric(as.factor(copy_train$NObeyesdad)) - 1
+copy_test$y <- as.numeric(factor(copy_test$NObeyesdad, levels = levels(as.factor(copy_train$NObeyesdad)))) - 1
+
+# Número de clases
+levels_lbl <- levels(as.factor(copy_train$NObeyesdad))
+K <- length(levels_lbl)
+
+# Pasar de factores a numéricos
+tabla_preds <- setdiff(names(copy_train), c("NObeyesdad", "y"))
+copy_train[tabla_preds] <- lapply(copy_train[tabla_preds], function(z) if(is.numeric(z)) z else as.numeric(as.factor(z)))
+copy_test[tabla_preds]<- lapply(copy_test[tabla_preds],  function(z) if(is.numeric(z)) z else as.numeric(as.factor(z)))
+
+df_train <- copy_train[c(tabla_preds, "y")]
+df_train$y <- factor(df_train$y, levels = 0:(K-1))
+df_test <- copy_test[tabla_preds]
+
+# Función AdaBoost
+adaboost_train_rpart <- function(df, M) {
+  n <- nrow(df)
+  w <- rep(1/n, n)
+  stumps <- vector("list", M)
+  alphas <- numeric(M)
+  K <- length(levels(df$y))
+  
+  for (m in seq_len(M)) {
+    stump <- rpart(y ~ ., data = df, weights = w, control = rpart.control(maxdepth = 1, cp = 0, minsplit = 2))
+    pred_factor <- predict(stump, df, type = "class")
+    pred_num <- as.numeric(pred_factor) - 1
+    y_num <- as.numeric(df$y) - 1
+    
+    # Error ponderado
+    err <- sum(w * (pred_num != y_num))
+    err <- pmin(pmax(err, 1e-10), 1 - 1e-10)
+    
+    # Coeficiente alpha
+    alphas[m] <- log((1 - err)/err) + log(K - 1)
+    
+    # Actualizar pesos
+    w <- w * exp(alphas[m] * (pred_num != y_num))
+    w <- w / sum(w)
+    
+    stumps[[m]] <- stump
+  }
+  list(stumps = stumps, alphas = alphas, K = K)
+}
+
+# Función de predicción
+adaboost_predict_rpart <- function(model, df) {
+  M <- length(model$alphas)
+  n <- nrow(df)
+  scores <- matrix(0, n, model$K)
+  
+  for (m in seq_len(M)) {
+    pred_factor <- predict(model$stumps[[m]], df, type = "class")
+    pred_num <- as.numeric(pred_factor) - 1
+    for (k in 0:(model$K - 1)) {scores[, k+1] <- scores[, k+1] + model$alphas[m] * (pred_num == k)}
+  }
+  
+  apply(scores, 1, which.max) - 1
+}
+
+# Tiempo
+time_taken <- system.time({model_ab <- adaboost_train_rpart(df_train, M = 10)})
+cat(sprintf("Tiempo de entrenamiento: %.2f s\n", time_taken[3]))
+
+# Predicciones y accuracy
+datos_pred <- df_test
+preds <- adaboost_predict_rpart(model_ab, datos_pred)
+accuracy <- mean(preds == copy_test$y) * 100
+cat(sprintf("Accuracy en test: %.2f%%\n", accuracy))
+```
+
+Pasos:
+
+1. Inicializar los pesos $w_i = 1/n$.
+2. Para $m = 1, ..., M$ : 
+- Entrenamos un árbol de decisión de profundidad 1 (stump) con los pesos $w$.
+- Calculamos el error ponderado.
+- fijamos el coeficiente $\alpha_m$.
+- Actualizamos y normalizamos los pesos.
+3. Predicciones: para cada clase k, se suman los $\alpha_m$ de los arboles  que predicen k  y escogemos  la clase  con mayor suma.
+
+En el código, la función `adaboost_train_rpart()` hacemos los bucles, pesos y se guardan los árboles y valores de alpha, mientras que `adaboost_predict_rpart()` es la que elige la clase "ganadora".
+
+# Naive Bayes
+
+
+
+
+
+
+
+
+
+
