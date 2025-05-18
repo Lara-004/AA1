@@ -536,6 +536,14 @@ print(cf)
 
 Con la matriz de confusión podemos determinar que el método de árboles de decisión es muy buena, acertando en la mayoría de los casos el tipo de obesidad de los individuos y obteniendo un valor cercano a 1 en Pos Pred Value, Neg Pred Value, Specificity, Sensitivity y Balanced Accuracy en las estadísticas por clase.
 
+Medidas de rendimiento usadas en el modelo:
+
+La matriz de confusión, sensibilidad y especificidad (cuán bien detecta y descarta cada clase) y el valor Accuracy. 
+
+Estas métricas nos permiten ver el modelo desde varios ángulos: la matriz de confusión nos muestra con detalle sus aciertos y errores; la sensibilidad y la especificidad nos dicen qué tan bien identifica correctamente cada tipo de obesidad; el valor predictivo positivo y negativo nos da la confianza real que podemos tener en las predicciones y el valor Accuracy nos garantiza que el rendimiento global del modelo equilibre de manera justa la detección de casos con el descarte correcto de los no afectados.
+
+Con todo esto no solo comprobamos que el modelo sea preciso, sino que lo haga de manera equilibrada y fiable.
+
 
 ### Métodos de Ensamblado
 
@@ -717,6 +725,14 @@ Finalmente, el rendimiento de este modelo de Boosting es de 16% aproximadamente,
 
 En conclusión, los resultados obtenidos del algoritmo implementado es mucho más eficiente (valor de Accuracy de 40% aproximadamente) ya que las iteraciones y bucles son controladas, el propio algoritmo está personalizado a nuestro caso concreto y hemos ajustado los parámetros para nuestro ejemplo concreto.
 
+Medidas de rendimiento utilizadas:
+
+La matriz de confusión que nos dice exactamente en qué grados de obesidad el modelo secuencial se equivoca, mostrando falsos positivos y negativos por clase.
+El log-loss (“mlogloss”) que penaliza las predicciones muy seguras que resultan erróneas, ayudándonos a calibrar la confianza del modelo.
+El Accuracy (de un 16%) que nos indica que XGBoost no generaliza bien el conjunto de test.
+La sensibilidad y especificidad por clase nos dicen en qué niveles de obesidad detecta correctamente casos y evita falsos diagnósticos.
+Los valores predictivos positivo y negativo nos aportan la confianza real en cada predicción concreta.
+
 
 ### Random Forest
 
@@ -773,7 +789,16 @@ Parece ser que la más importante es Weigth, la variable de peso del individuo q
 
 Esto es llamativo ya que en muchos de los modelos anteriormente usados concueran en que para predecir, la variable con más peso en la mayoría de los modelos es Weigth, principalmente.
 
+Medidas de rendimiento utilizadas:
 
+La matriz de confusión, Accuracy, coeficiente Kappa
+
+La matriz de confusión nos muestra con detalle cuántos casos de cada categoría de obesidad el modelo acierta o confunde, revelando falsos positivos y falsos negativos. 
+El valor Accuracy (0,93) indica que el bosque de árboles acierta en el 93 % de las predicciones, un nivel de acierto muy elevado. 
+El coeficiente Kappa (0,92) que corrige la probabilidad de aciertos aleatorios y confirma que nuestro modelo clasifica de forma significativamente mejor que el azar.
+La sensibilidad, que nos dice qué proporción de verdaderos casos, y los valores predictivos positivo y negativo.
+
+En conjunto, estas métricas garantizan que nuestro modelo de Random Forest no solo sea preciso, sino también equilibrado y fiable.
 
 
 ### Naive Bayes
