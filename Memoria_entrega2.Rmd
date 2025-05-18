@@ -849,6 +849,7 @@ A continuación, hemos implementado manualmente el algoritmo Naive Bayes y asi c
 
 ```{r}
 # Predicciones en TEST
+modelo_naive_manual <- entrenar_naive_bayes(train, "NObeyesdad")
 pred_test_manual <- sapply(1:nrow(test), function(i) {
   predecir_naive_bayes(modelo_naive_manual, test[i, ])
 })
