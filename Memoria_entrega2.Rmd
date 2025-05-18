@@ -273,7 +273,7 @@ Por lo que podemos concluir que es un modelo que ajusta bastatnte bien nuestros 
 A continuación vamos a comparalo con el k-NN que hemos hecho manualmente.
 
 ```{r}
-source("KNN.R")
+source("Memoria_Funciones.Rmd")
 
 train.df_x <- train.df |> dplyr::select(is.numeric)
 test.df_x <- test.df |> dplyr::select(is.numeric)
@@ -465,7 +465,7 @@ $$
 $$
 
 ```{r}
-source("LDA.R")
+source("Memoria_Funciones.Rmd")
 train_num <- train.df |> dplyr::select(where(is.numeric))
 test_num <- test.df |> dplyr::select(where(is.numeric))
 
