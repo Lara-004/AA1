@@ -600,17 +600,26 @@ MDSplot(rf,as.factor(train$NObeyesdad),k=3)
 ```
 
 ```{r}
-df.test <- test %>%
-  dplyr::select(Gender, Age, Height, Weight,
-                family_history_with_overweight, FAVC, FCVC, NCP,
-                CAEC, SMOKE, SCC, FAF, TUE, CH2O, CALC, MTRANS)
+vars <- setdiff(names(train), "NObeyesdad")
+
+df.test <- test[, vars]
+for (v in vars) {
+  if (is.factor(train[[v]])) {
+    df.test[[v]] <- factor(df.test[[v]], levels = levels(train[[v]]))
+  } else {
+    df.test[[v]] <- as.numeric(df.test[[v]])
+  }
+}
+
+#Hacemos predicción
 prediction.rf <- predict(rf, df.test)
 
-niveles_comunes <- union(levels(prediction.rf), levels(test$NObeyesdad))
+#Creamos factores con niveles iguales para comparación
+niveles <- levels(train$NObeyesdad)
+prediction.rf <- factor(prediction.rf, levels = niveles)
+real.rf <- factor(test$NObeyesdad, levels = niveles)
 
-prediction.rf <- factor(prediction.rf, levels = niveles_comunes)
-real.rf <- factor(test$NObeyesdad, levels = niveles_comunes)
-
+# Matriz de confusión
 cf <- confusionMatrix(prediction.rf, real.rf)
 print(cf)
 
