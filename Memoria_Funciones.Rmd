@@ -73,6 +73,42 @@ obesidad$FAF <- round(obesidad$FAF)
 
 # k-NN
 
+# Función k-NN con distancia euclides
+mi_knn <- function(train, test, cl, k = 5) {
+  # Verificamos que las dimensiones estan bien
+  if(nrow(train) != length(cl)) {
+    stop("El número de filas de train debe coincidir con la longitud de cl")
+  }
+  
+  # Convertir a matrices para evitar problemas con data frames
+  train <- as.matrix(train)
+  test <- as.matrix(test)
+  cl <- as.vector(cl)
+  
+  # Comprobamos que train y test tienen el mismo número de columnas
+  if(ncol(train) != ncol(test)) {
+    stop("train y test deben tener el mismo número de columnas")
+  }
+  
+  # Calculamos las distancias euclideas
+  distancias <- sqrt(outer(
+    rowSums(train^2), 
+    rowSums(test^2), 
+    "+"
+  ) - 2 * tcrossprod(train, test))
+  
+  # Buscamos lo k, vecinos más cercanos
+  vecinos <- apply(distancias, 2, function(x) order(x)[1:k])
+  
+  # Despues de buscarlo predecimos las clases más frecuentes.
+  predicciones <- apply(vecinos, 2, function(indices) {
+    clases_vecinos <- cl[indices]
+    names(which.max(table(clases_vecinos)))
+  })
+  
+  return(predicciones)
+}
+
 # Análisis Discriminante Lineal.
 
 # Bagging
