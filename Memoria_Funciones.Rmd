@@ -113,6 +113,7 @@ mi_knn <- function(train, test, cl, k = 5) {
 
 # Bagging
 
+
 Comenzamos detallando los pasos que hemos seguido para programar el método de bagging.
 
 1.  Definimos manualmente los niveles posibles de cada variable categórica ya que algunos niveles pueden no aparecer en las muestras aleatorias y da error al predecir. También recorremos todas las columnas de train y ajustamos los niveles categóricos según la lista que ya hemos creado.
@@ -135,7 +136,7 @@ Comenzamos detallando los pasos que hemos seguido para programar el método de b
 
     · Esto simula el cálculo del error OOB.
 
-4.  Evaluamos el modelo bagging manual generando la matriz de confusion con las predicciones OOB frente a la etiquetas del conjunto train.
+4.  Evaluamos el modelo bagging manual en el archivo principal generando la matriz de confusion con las predicciones OOB frente a la etiquetas del conjunto train y comparandolo con la funcion propia de R.
 
 #### Definimos los niveles manualmente
 
@@ -259,25 +260,6 @@ prediccion_oob <- function(modelos, oob_indices, data) {
 }
   
   
-```
-
-#### Evaluación con matriz de confusión
-
-```{r}
-# Entrenamos el bagging manual con 500 árboles
-modelo_bagging <- bagging_manual(train, "NObeyesdad", n_trees = 500)
-
-# Obtenemos predicciones usando solo los árboles en los que la observación fue OOB
-pred_oob <- prediccion_oob(modelo_bagging$modelos, modelo_bagging$oob, train)
-
-# Quitamos los NA (observaciones que ningún árbol dejó fuera)
-idx_validos <- !is.na(pred_oob)
-
-# Evaluamos la precisión sobre las observaciones OOB
-matriz <- confusionMatrix(pred_oob[idx_validos], train$NObeyesdad[idx_validos])
-
-print(matriz)
-
 ```
 
 
