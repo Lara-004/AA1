@@ -106,84 +106,236 @@ Dado nuestro problema, que es averiguar el nivel de obesidad de las personas seg
 
 ### k-NN
 
-Primero vamos a ver que variable son las necesarias para poder hacer un buen modelo de knn. Como hemos visto en el EDA, hay ciertas variables que tiene más relación que otras, esas son height, weight, family history with overweight, gender, FAVC (Consumo de alimentos altos en calorias), FAF (Frecuencia de actividad física) y MTRANS (Medio de transporte).
+En esta sección se analiza el algoritmo de clasificación k-Nearest Neighbors (k-NN), con el objetivo de predecir el nivel de obesidad que puede alcanzar una persona, utilizando variables personales como edad, altura o peso, así como información sobre sus hábitos alimentarios, de actividad física y estilo de vida.
+
+El algoritmo k-NN se basa en la idea de que una observación será similar a aquellas que tiene más cerca en el espacio de características. Es un modelo no paramétrico, lo que significa que no hace suposiciones sobre la distribución de los datos, y es especialmente útil cuando se desea aplicar una lógica de clasificación intuitiva basada en similitud.
+
+En el contexto de este problema de clasificación multiclase —donde la variable objetivo NObeyesdad puede tomar siete valores distintos— k-NN es una opción válida, ya que maneja bien múltiples clases sin necesidad de modificar su estructura interna.
+
+Antes de entrenar el modelo, se ha llevado a cabo un preprocesamiento imprescindible: se han codificado las variables categóricas mediante técnicas como one-hot encoding o codificación ordinal, y se han escalado todas las variables numéricas para que ninguna tenga un peso desproporcionado al calcular las distancias. Estas transformaciones son esenciales, ya que k-NN se basa en una métrica de distancia (normalmente euclídea) que es sensible a la escala de los datos.
 
 ```{r}
-# Primero de todo, vamos a usar 10 fold cross validation y lo vamos a repetir 5 veces.
-trainControl <- trainControl(method="repeatedcv", number=10, repeats=5)
-metric <- "Accuracy"
+# Transformamos nuestra variable objetivo en factor.
+train$NObeyesdad <- as.factor(train$NObeyesdad)
+test$NObeyesdad <- as.factor(test$NObeyesdad)
 
-# Creamos la semilla y buscamos el mejor valor de k para tener un buen modelo.
+# Creamos una funcón para normalizar las variables.
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+# Seleccionamos las variables que vamos a necesitar para el modelo.
+train.df <- dplyr::select(train, Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+test.df <- dplyr::select(test, Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+val.df <- dplyr::select(val, Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
+
+# Primero de todo, vamos a crear una receta para asegurarnos de que train, test y val sean consistentes, para poder tener las mismas variables en todas y que no halla problemas.
+receta <- recipe(NObeyesdad ~ ., data = train.df) %>%
+  step_dummy(all_nominal(), -all_outcomes()) %>%
+  step_scale(all_numeric()) %>%
+  step_zv(all_predictors()) %>%
+  step_nzv(all_predictors())
+
+# One-Hot Encoding con train, test y validation
+train_prep <- prep(receta, training = train.df)
+train.df <- bake(train_prep, new_data = train.df)
+test.df <- bake(train_prep, new_data = test.df) 
+val.df <- bake(train_prep, new_data = val.df)
+```
+
+Antes de hacer cualquier modelo, vamos a observar como se ven los datos, depues de la transformación que hemos hecho, vamos a comprobar que todo está bien y que no hay que ajustar nada. Para hacer esto, vamos a ver el resumen de train.df y test.df.
+
+```{r}
+summary(train.df)
+```
+
+```{r}
+summary(test.df)
+```
+Ahora que tenemos todas las variables en train y test vamos con el modelo. Dado que el modelo de k-NN es una métrica de distancias, hemos cuantificado las variables categóricas, al igual que hemos escalado mediante la normalización min manx nuestras variables. A continuación, nos vamos a dedicar a buscar el mejor valor de k para hacer un modelo de Machine Learning que nos prediga bastante bien y con el que no tengamos problemas como sobreajuste. Para seleccionar el mejor valor de k, vamos a utilizar la técnica de grid search.
+
+```{r}
+# Usamos 10-fold cross validation repetida 3 veces
+trainControl <- trainControl(method = "repeatedcv", 
+                             number = 10, 
+                             repeats = 3, 
+                             classProbs = TRUE, 
+                             summaryFunction = multiClassSummary,
+                             savePredictions = "final")
+
 set.seed(1)
 
-train.df <- train |> dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
-train.df[,2] <- scale(train.df[,2])
-train.df[,3] <- scale(train.df[,3])
-train.df[,6] <- scale(train.df[,6])
+# Introducimos el frid para buscar el mejor valor para k
+grid <- expand.grid(.k = seq(1, 30, by=2))
 
-fit.knn <- train(NObeyesdad ~ ., data=train.df, method="knn", metric=metric ,trControl=trainControl, preProcess = c("center", "scale"))
-knn.k1 <- fit.knn$bestTune 
+fit.knn <- train(NObeyesdad ~ ., 
+                 data = train.df, 
+                 method = "knn", 
+                 metric="Accuracy", 
+                 tuneGrid = grid, 
+                 trControl=trainControl)
+
+knn.k2 <- fit.knn$bestTune
 print(fit.knn)
 ```
-Como podemos observar, el mejor valor de k que podemos obtener es de k = 5. Al mirar los resultados podemos ver que el programa ha probado con k = 5 obteniendo una precisión del 80%, aproximadamente, y un indice kappa de 0.76 aproximadamente. Conforma aumentamos el valor de k, en este caso prueba con k = 7 y k = 9, podemos ver como la precisión de nuestro modelo disminuye, al igual que el indice kappa, lo que nos da a entender que cuanto más aumentemos k partiendo de k = 5, pero va a ser nuestro modelo. A continuación vamos a verlo en tabla.
 
 ```{r}
-plot(fit.knn)
+ggplot(fit.knn) +
+  labs(title = "Precisión del modelo k-NN según el valor de k",
+       x = "Número de vecinos (k)", y = "Accuracy")
+
 ```
 
-Como vemos a partir de k = 5, la precisión de nuestro modelo desciende draticamente. Por lo que viendo el gráfico y las métricas anteriores, podemos observar que k = 5 es el mejor valor que podemos seleccionar. A continuación vamos a obtener la predicción para nuestro conjunto de datos de prueba y vamos a imprimir la matriz de confusión. 
+Como podemos ver tanto en la gráfica como en el modelo, el mejor k posible es 1, sin embargo este valor de k es bastante bajo lo que nos puede indicar que tenemos cierto sobreajuste en nuestros datos, para poder verificar esto, vamos a ver como nos predice el modelo para los datos de entrenamiento y para los datos de test.
 
 ```{r}
-set.seed(1)
-
-# Primero calculamos la media de las variables que queremos estandarizar.
-# media_height <- mean(train$Height)
-# stddev_height <- sqrt(var(train$Height))
-# test.df <- test |> mutate(Height=(Height - media_height)/stddev_height)
-# 
-# media_weight <- mean(train$Weight)
-# stddev_weight <- sqrt(var(train$Weight))
-# test.df <- test |> mutate(Weight=(Weight - media_weight)/stddev_weight)
-# 
-# media_FAF <- mean(train$FAF)
-# stddev_FAF <- sqrt(var(train$FAF))
-# test.df <- test |> mutate(FAF=(FAF - media_FAF)/stddev_FAF)
-
-test.df <- test |> dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad)
-test.df[,2] <- scale(test.df[,2])
-test.df[,3] <- scale(test.df[,3])
-test.df[,6] <- scale(test.df[,6])
-
-prediction <- predict(fit.knn,newdata=test.df)
-cf <- confusionMatrix(prediction, as.factor(test.df$NObeyesdad),positive="yes")
+prediction_train <- predict(fit.knn,newdata=train.df)
+cf <- confusionMatrix(prediction_train, as.factor(train.df$NObeyesdad),positive="yes")
 print(cf)
 ```
 
+```{r}
+prediction_test <- predict(fit.knn,newdata=test.df)
+conf_matrix <- confusionMatrix(prediction_test, test.df$NObeyesdad)
+print(conf_matrix$byClass[, c("F1", "Recall", "Precision")])  # Por clase
+cat("F1-Macro:", mean(conf_matrix$byClass[, "F1"]), "\n")  # Global
+```
+```{r}
+ggplot(as.data.frame(conf_matrix$table), aes(Prediction, Reference, fill = Freq)) +
+  geom_tile() + 
+  scale_fill_gradient(low = "white", high = "red") +
+  labs(title = "Matriz de Confusión (k-NN) - ¡Sangre de Clases Mal Clasificadas!")
+```
+
+
+Viendo esta matriz de confusión y bajo la hipótesis que hemos dicho antes, podemos ver como el modelo ajusta bien para los datos con los que hemos entrenado el modelo, esto no es bueno, ya que para datos nuevo no predice bien, ya que el modelo se ajusta también al ruido de nuestros datos de entrenamiento. Como observamos, despues de probar el modelo con datos nuevos, hay bastante diferencia entre el accuracy de la prediccion con los datos de entrenamiento y los datos de testeo, por lo que podemos ver que al elegir el mejor k con grid search, nos lleva al sobreajuste, por lo que ahora vamos a hacer el modelo pero cambiando la métrica a F1. Para evitar esto, vamos a obligar a nuestro modelo a que no seleccione el valor de k = 1.
+
+
+
+Dado que con F1 tambien nos sale un k mayor a 1, lo que vamos a hacer es forzar a nuestro problema a tener un k > 1, sin embargo tiene que ser lo suficiente grande para no tener sobreajuste, pero lo suficiente pequeño para que el modelo sea lo más probable posible, para ello, vamos a empezar en k = 5 y que sean impares.
+
+```{r}
+set.seed(1)
+
+# Introducimos el frid para buscar el mejor valor para k
+grid <- expand.grid(.k = seq(5, 30, by=2))
+
+fit.knn <- train(NObeyesdad ~ ., 
+                 data = train.df, 
+                 method = "knn", 
+                 metric="Mean_F1", 
+                 tuneGrid = grid, 
+                 trControl=trainControl)
+
+knn.k2 <- fit.knn$bestTune
+print(fit.knn)
+```
+
+```{r}
+ggplot(fit.knn) +
+  labs(title = "Precisión del modelo k-NN según el valor de k",
+       x = "Número de vecinos (k)", y = "Mean_F1")
+```
+
+Despues de ajustarlo para que el valor mínimo sea k = 5, vemos que nos sale el valor de k = 5, ahora lo que vamos a hacer es comprobar que no hay sobreajuste en nuestros datos.
+
+```{r}
+prediction_train <- predict(fit.knn,newdata=train.df)
+cf <- confusionMatrix(prediction_train, as.factor(train.df$NObeyesdad),positive="yes")
+print(cf)
+```
+
+```{r}
+prediction_test <- predict(fit.knn,newdata=test.df)
+cf <- confusionMatrix(prediction_test, as.factor(test.df$NObeyesdad),positive="yes")
+print(cf)
+```
+
+Despues ver como de preciso es nuestro modelo con los datos de entrenamiento, hemos podido observar que, nuestro modelo con datos nuevos tiene una exactitud del 80%, lo que, a priori, es bastante bueno, además de esto, tenemos que el p-valor es inferior a 0.05 lo que nos podría indicar que el modelo es significativo para poder hacer predicciones sobre nuestra variable objetivo, por otro lado, hay distintos valores que nos interesa estudiar y conocer:
+
+Por un lado tenemos la sensibilidad, siendo esta la probabilidad de que a una persona se le asigne a una clase cuando de verdad se le asigna a esa clase, como podemos observar no tienen un valor excesivamente alto a excepcion de Obesity_Type_III que nos da una sensibilidad del 100%.
+
+A parte, también tenemos la especificidad que es la probabilidad de predecir que una persona no pertenece a una de las clases de nuestra variable objetivo cuando de verdad no pertenece a esa clase. Como podemos ver, este modelo predice mejor la tasa de verdaderos negativos o especificidad que la sensibilidad, lo que nos da un modelo que nos predice más si una persona no pertenece a una clase que si una persona pertence a una clase.
+
+También tenemos la precisión, que es el porcentaje de acertar cuando se predice una de las clases que tenemos en nuestra variable, como podemos ver hay algunas como Normal_Weight y Overweight_Level_II que tiene un valor predictivo positivo bastante bajo en comparacion con el modelo, lo que puede hacer que a la hora de predecir el modelo clasifique pero estas características.
+
+Además de detectar los valores predictivos positivos, tambien puede detectar los negativos, que como era de esperar, ya que la especificidad es bastante alta, tiene valores bastante altos.
+
+Por último tenemos la exactitud balanceada, con la que podmos ver con que exactitud nuestro modelo ajusta los datos en cada clase, como ya hemos dicho antes, la clase de Obesity_Type_III ajusta muy bien, dandonos una exactitud balanceada del 100%, mientras que los otrso tienen un valor que se acercamás al 80% a excepción de Overweight_Level_I y Overweight_Level_II que se acerca más al 80%. Para esto, vamos a ver las clases problemáticas.
+
+```{r}
+f1_scores <- confusionMatrix(prediction_test, test.df$NObeyesdad)$byClass[, "F1"]
+print(f1_scores[f1_scores < 0.7])
+```
+
+Por lo que podemos concluir que es un modelo que ajusta bastatnte bien nuestros datos, sin embargo hay ciertas clases que le cuesta un poco más identificar, para trabajos futuros, lo que podrías buscar es poder aumentar la precisión de esas variables, manteniendo la explicabilidad del modelo y la exactitud, o por lo menos que no disminuya demasiado, nuestro modelo.
+
+A continuación vamos a comparalo con el k-NN que hemos hecho manualmente.
+
+```{r}
+source("KNN.R")
+
+train.df_x <- train.df |> dplyr::select(is.numeric)
+test.df_x <- test.df |> dplyr::select(is.numeric)
+
+pred_manual <- mi_knn(train = train.df_x, test = test.df_x, cl = train.df$NObeyesdad, k = 5)
+table(Predicho = pred_manual, Real = test.df$NObeyesdad)
+
+# Precisión manual
+precision_manual <- mean(pred_manual == test.df$NObeyesdad)
+```
+
+```{r}
+cf$table
+```
+
+
 ### Análisis Discriminante Lineal.
 
-Primero de todo, vamos a ver nuestra variable objetivo para ver si es de tipo factor, en caso de no serlo, lo transformamos.
+A continuación vamos a crear un modelo aplicando el análisis discriminante lineal, con el cual lo que buscamos es la proyección de nuestros datos en un espaio de menor dimensionalidad donde tengamos clases que estén lo más separadas que se pueda, es decir, buscamos maximizar la distancia entre observaciones. Además de esto, este modelo asume normalidad multivariante y homocedasticidad, la varianza constante entre clases.
+
+Dado que nuestro problema es conseguir diferenciar a personas por su tipo de obesidad, este modelo es adecuado ya que es adecuado cuando esas clases se diferencian bien, además de esto nos proporciona funciones discriminantes para interpretar varaibles que nos separan mejor las distintas clases de nuestra variables objetivo.
+
+Pero hay que tener en cuenta ciertas cosas que nos pueden perjudicar como que este modelo es sensible para outliers además de que requiere que verifiquemos los supuestos antes mencionados, normalidad y homocedasticidad. Para ello, vamos a confirmar el supuesto de normalidad de multivariante mediante la prueba de Mardia
 
 ```{r}
-str(train$NObeyesdad)
+train_num <- train.df %>% dplyr::select(is.numeric)
+result <- mvn(data = train_num, mvnTest = "mardia")
+result$multivariateNormality
 ```
 
-Como es de tipo caracter, hacemos el cambio a factor
+Despues de comprovar, podemos ver como el p-vaor en ambos es inferior a 0.05, lo que nos indica que no hay normalidad multivariante, lo que nos dificulta el pode utilizar el lda, sin embargo, lo vamos a usar, ya que aunque no haya normalidad multivariante para aplicarlo como un modelo lineal de referncia y poder compara su rendimiento con otros modelos. A parte de esto, vamos a ver si nuestros datos presentan homocedasticidad.
 
 ```{r}
-train$NObeyesdad <- as.factor(train$NObeyesdad)
+boxM(train.df[, -which(names(train.df) == "grupo")], train.df$NObeyesdad)
 ```
 
-Ahora vamos a hacer el análisis discriminante lineal.
+Al hacer la prueba de homocedasticidad mediante la prueba de Box's M, hemos obtenido un p-valor igual a 1, lo que nos suguiere que nuestro modeo tiene homocedasticidad en los datos, indicandonos que las matrices de covarianza son bastante similares entre los distintos grupos, por lo que, ya que el supuesto de homocedasticidad se cumple, pero el de linealidad no, vamos a proceder a hacer el lda para, como he dicho antes, usarlo como un modelo lineal de referencia para otros modelo.
 
 ```{r}
-# Creamos el modelo lda
-lda_modelo <- lda(NObeyesdad ~ ., data = train)
+# Entrenamos el modelo
+modelo_lda <- lda(NObeyesdad ~ ., data = train.df)
 
-# Buscamos las predicciones de lda
-lda_predicciones <- predict(lda_modelo)
+# Hacemos las predicciones sobre test
+pred_lda <- predict(modelo_lda, newdata = test.df)
 
-# Representacion del lda
-lda_train <- data.frame(Componente_1 = lda_predicciones$x[, 1], Clase = train$NObeyesdad)
+# Calculamos la exactitud de nuestro modelo
+acc_lda <- mean(pred_lda$class == test.df$NObeyesdad)
+cat("Accuracy LDA con MASS:", acc_lda, "\n")
+
+```
+
+Al entrenar el modelo de lda, podemos ver como el nievel de accuracy, o la representacion de la proporciones observadas correctamente predichas para nuestro modelo es bastante alta, siendo, aproximadamente 0.9, lo que podemos intuir que es un modelo que separa bastante bien las clases.
+
+```{r}
+confusion <- table(Predicted = pred_lda$class, Actual = test.df$NObeyesdad)
+print(confusion)
+```
+
+Despues de crear el model y ver su accuracy, vamos a ver la matriz de confución para ver como de bien es capaz de predecir nuestro modelo. Como podemos observar, nuestro modelo precide bastante bien la mayoría de las clases de nuestra variable objetivo, a excepción de Overweight_Level_II, por lo que este modelo puede ser una buena comparación para otros modelos. A parte de esto, los distintos errore que vemos que puede cometer, podemos ver que son bastante normales, ya que son los de la clase siguiente o anterior, para ello, lo vaos a ver gráficamente.
+
+```{r}
+lda_train <- data.frame(Componente_1 = pred_lda$x[, 1], Clase = test.df$NObeyesdad)
 
 ggplot(lda_train, aes(x = Componente_1, y = 0, color = Clase)) +
   geom_point(size = 3) +
@@ -196,45 +348,119 @@ ggplot(lda_train, aes(x = Componente_1, y = 0, color = Clase)) +
   scale_color_manual(values = rainbow(length(unique(lda_train$Clase))))
 ```
 
-Al visualizar la proyección del LDA, podemo ver que en la parte central de las componentes discriminantes hay tipos de obesidad solapados, lo que nos puede indicar que tienen caracteríasticas similares, entre ellos se pueden ver overweight level II y obesity type I, también se puede ver como tenemos valores que están en los extremos, lo que nos puede decir que diferenciarlos de los otros grupos es más senciello. Para estudiar mejor sus diferencias, vamos a hacer un boxplot de las componenetes por clase y un violin plot.
+Como hemos podido ver en la matriz de confusión las distintas clases del tipo de obesidad se pueden ver bastante bien, además de poder verse como colosiona una clase con otra, confundiendose en parte de clase, por lo que puede ser un buen modelo para poder compararlo con otros. A continuación vamos a ver los distintos discriminantes y los vamos a nalizar.
 
 ```{r}
-# Definir colores
-colores <- rainbow(length(unique(lda_train$Clase)))
+proj <- data.frame(
+  LD1 = pred_lda$x[, 1],
+  Clase = test.df$NObeyesdad
+)
 
-# Boxplot
-boxplot_lda <- ggplot(lda_train, aes(x = Clase, y = Componente_1, fill = Clase)) +
-  geom_boxplot(alpha = 0.7) +
-  labs(
-    title = "Boxplot de la Proyección de LDA",
-    x = "Clase",
-    y = "Componente Discriminante 1"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
-    legend.position = "none" # Ocultar leyenda aquí
-  ) +
-  scale_fill_manual(values = colores)
+ggplot(proj, aes(x = LD1, fill = Clase)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Proyección LDA (primer discriminante)",
+       x = "LD1", y = "Densidad") +
+  theme_minimal()
 
-# Violin Plot
-violinplot_lda <- ggplot(lda_train, aes(x = Clase, y = Componente_1, fill = Clase)) +
-  geom_violin(alpha = 0.7) +
-  labs(
-    title = "Violin Plot de la Proyección de LDA",
-    x = "Clase",
-    y = "Componente Discriminante 1"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
-    legend.position = "none" # Ocultar leyenda aquí también
-  ) +
-  scale_fill_manual(values = colores)
-
-# Mostrar gráficos
-grid.arrange(boxplot_lda, violinplot_lda, ncol = 2)
 ```
+
+En este primer discriminante, podemos ver como las distintas clases se separan perfectamente, además podemosv er que la clase Overweight_Level_II tiene la mayor densidad dentro de estas clases.
+
+```{r}
+proj <- data.frame(
+  LD2 = pred_lda$x[, 2],
+  Clase = test.df$NObeyesdad
+)
+
+ggplot(proj, aes(x = LD2, fill = Clase)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Proyección LDA (segundo discriminante)",
+       x = "LD2", y = "Densidad") +
+  theme_minimal()
+```
+
+En este segundo discriminante, se ve que las clases estan más juntas, incluso superpuestas, sin embargo vemos que las clases de Obesity_Type_II y Obesity_Type_III estan bastante separadas, además de tener las mayores densidades lo que puede indicar que para este discriminante son las más importantes.
+
+```{r}
+proj <- data.frame(
+  LD3 = pred_lda$x[, 3],
+  Clase = test.df$NObeyesdad
+)
+
+ggplot(proj, aes(x = LD3, fill = Clase)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Proyección LDA (tercer discriminante)",
+       x = "LD3", y = "Densidad") +
+  theme_minimal()
+```
+
+En este tercer discriminante, podemos ver como todas las clases están más o menos centradas, además de que se podría decir que siguien una distribución normal de media 0 (aproximadamente), por lo que podemos concluir que par este discriminante las variables se han normalizado.
+
+```{r}
+proj <- data.frame(
+  LD4 = pred_lda$x[, 4],
+  Clase = test.df$NObeyesdad
+)
+
+ggplot(proj, aes(x = LD4, fill = Clase)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Proyección LDA (cuarto discriminante)",
+       x = "LD4", y = "Densidad") +
+  theme_minimal()
+```
+
+En este discriminante, se pueden ver distintos grupos, en los cuales en ambos hay de todos los tipos de clases, podemos ver que en este discriminante lo que se ha hecho ha sido separa según dos parámetros que no sabemos exactamente cuales son.
+
+```{r}
+proj <- data.frame(
+  LD5 = pred_lda$x[, 5],
+  Clase = test.df$NObeyesdad
+)
+
+ggplot(proj, aes(x = LD5, fill = Clase)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Proyección LDA (quinto discriminante)",
+       x = "LD5", y = "Densidad") +
+  theme_minimal()
+```
+Este discriminante no sabemos muy bien que es lo que puede significar, para ello, necesitariamos al experto que nos ayudase a poder comprender esta nueva variable para poder hacer mejores predicciones.
+
+```{r}
+proj <- data.frame(
+  LD6 = pred_lda$x[, 6],
+  Clase = test.df$NObeyesdad
+)
+
+ggplot(proj, aes(x = LD6, fill = Clase)) +
+  geom_density(alpha = 0.5) +
+  labs(title = "Proyección LDA (sexto discriminante)",
+       x = "LD6", y = "Densidad") +
+  theme_minimal()
+```
+
+Con esta nos pasa lo mismo que con el discriminante anterior. A continuación vamos a ver las medidas que necesitamos para poder compara los modelos.
+
+```{r}
+library(caret)  # Si no está instalado: install.packages("caret")
+
+# Convertir a factor si no lo es
+predicciones <- as.factor(pred_lda$class)
+test.df$NObeyesdad <- as.factor(test.df$NObeyesdad)
+
+# Calcular métricas
+resultados <- confusionMatrix(predicciones, test.df$NObeyesdad, positive = "ClasePositiva")  # Especificar la clase positiva
+print(resultados)
+```
+
+Con estas medidas, podemos ver bastantes cosas muy interesantes, primero de todo es el nivel de accuracy, que como ya habiamos visto antes tiene un valor de 0.89, lo que nos da bastante explicabilidad, además de que el p-vamor es lo suficiente pequiño como para que el modelo sea bastante bueno.
+
+Por oro lado tenemos las distintas mediad que podemos ver como en la sensibilidad, la tasa de veces que acertamos cuando tenemso que acertar la clase es bastante alta, estnado en la mayoría con un valor caso de 0.9, lo que nos puede indicar que puede diferenciar bien las clases. 
+
+Pro otro lado, tenemos la tasa de verdaderos negativos, que es incluso mejor, como podemos ver el valor mínimo es de 0.95, lo que nos indica que sabe difernciar bien si una observacion va en una clase o no, dandonos un buen modelo de clasificación.
+
+Por otro lado los valores predichos, tanto positivos como negativos nos dan bastante altos, dandonos bastante explicabilidad a los datos. Por último tenemos la precisión balancead inidcandonos la exactitud con la que se predice en cada clase, por lo que se ve es bastante alta, lo que nos dice que es bastante buena.
+
+Sin embargo, aunque tengamos un muy buen modeo de clasificación no cumple el supuesto de normalidad multivariante que tiene que cumplir para poder aplicar lda, lo que nos da un modelo bastante bueno para compara con otros.
 
 ### Árboles de decisión
 
