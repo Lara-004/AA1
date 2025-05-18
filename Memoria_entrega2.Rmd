@@ -567,6 +567,37 @@ Al representar graficamente las Mean Decrease Accurancy y Mean Decrease Gini pod
 ```{r}
 MDSplot(rf,as.factor(train$NObeyesdad),k=3)
 ```
+Ahora vamos a comparar el método bagging con la función propia de R, con el método programado a continuación:
+
+Cargamos la función desde el archivo de funciones:
+
+```{r}
+source("Memoria_Funciones.R")
+```
+
+```{r}
+# Entrenamos el bagging manual con 500 árboles
+modelo_bagging <- bagging_manual(train, "NObeyesdad", n_trees = 500)
+
+# Obtenemos predicciones usando solo los árboles en los que la observación fue OOB
+pred_oob <- prediccion_oob(modelo_bagging$modelos, modelo_bagging$oob, train)
+
+# Quitamos los NA (observaciones que ningún árbol dejó fuera)
+idx_validos <- !is.na(pred_oob)
+
+# Evaluamos la precisión sobre las observaciones OOB
+matriz <- confusionMatrix(pred_oob[idx_validos], train$NObeyesdad[idx_validos])
+
+print(matriz)
+
+```
+
+Como podemos observar, el método bagging manual alcanza una precisión del 88,87% y un coeficiente Kappa de 0,8691 lo cual nos indica un buen rendimiento y una alta concordancia entre los valores reales y la predicción. Las clases con mejor desempeño son Obesidad de Tipo lll, que se ajusta perfectamente y Obesidad de Tipo 2, con una sensibilidad del 96%. Por otro lado, Sobre Peso NIvel l y y Nivel ll tienen precisiones mas bajas y se puede observar confusión entre ellas.
+
+Si lo comparamos con el modelo randomForest de R, realizado con el mismo número de árboles este logar una mayor precisión general y reduce el error OOB al 5,13%. Además, clasifica las clases de obesidad con una mayor precisión y reduce los errores de Sobre Peso Nivel l, aunque siga siendo la que se clasifica con mas dificultad.
+
+Por tanto, podemos concluir que el bagging programado manualmente es eficaz y ajusta bien, pero el modelo automático es mejor, ya que es mas exacto y está más equilibrado.
+
 
 #### Boosting
 
