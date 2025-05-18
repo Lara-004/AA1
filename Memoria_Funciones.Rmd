@@ -375,7 +375,146 @@ Pasos:
 En el código, la función `adaboost_train_rpart()` hacemos los bucles, pesos y se guardan los árboles y valores de alpha, mientras que `adaboost_predict_rpart()` es la que elige la clase "ganadora".
 
 # Naive Bayes
+Antes de comenzar con el código vamos a detallar los pasos que seguimos para realizar manualmente el método Naive Bayes:
 
+1.  Entrenamos el modelo manual construyendo la función entrenar_naive_bayes() que:
+
+    · Recorre cada clase de obesidad del target N0obeyesdad y calcula su probabilidad a priori (nrow(subconjunto) / total)
+
+    · Para cada predictor calcula la probabilidad condicional de cada valor dado cada clase usando suavizado Laplace.
+
+    · Almacenamos en una lista toda esta información organizada por clases
+
+2.  Predicción con Naive Bayes con la función predecir_naive_bayes()
+
+    · Para cada observación calculamos la probabilidad total (en escala logaritmica) para cada clase de obesidad.
+
+    · Sumamos los logaritmos de las probabilidades condicionales de cada atributo dado una clase.
+
+    · Nos devuelve la clase más probable según el criterio de máxima verosimilitud
+
+3.  Evaluación del modelo
+
+    · Aplicamos el modelo a test prediciendo la clase de obesidad para cada observacion.
+
+    · Comparamos las clases predichas con las reales, construyendo la matriz de confusión, la cual muestra cuantas veces el modelo acertó o se equivocó al predecir cada clase, a partir de la matriz ontenemos distintas métricas.
+
+#### Entrenamienro del modelo
+
+```{r}
+# Esta funcion entrena el modelo Naive Bayes usando conteos y probabilidales con el suavizado de Laplace
+#Definimos una funcion que recibe el conjunto de datos, y el target
+entrenar_naive_bayes <- function(data, target_col) {
+ 
+   #Extraemos los valores unicos de la variable objetivo
+  clases <- unique(data[[target_col]])
+  
+  #Guardamos el total de filas del dataset
+  total <- nrow(data)
+  
+  #Guardamos todas las probabilidades calculadas para cada clase
+  modelo <- list()
+  
+  #Recorremos cada clase posible (en nuestro caso de obesidad):
+  for (clase in clases) {
+  
+      #Filtramos solos las filas que pertenecen a esa clase:
+    subconjunto <- data[data[[target_col]] == clase, ]
+    
+    #Probabilidad a prori de esa clase (numero de ocurrencias entre el total):
+    prob_clase <- nrow(subconjunto) / total
+    
+    #Guardamos la probabilidades condicionales para cada atributo:
+    probs_atributos <- list()
+    
+    #Recorremos todas las columnas excepto la clase que vamos a predecir:
+    for (col in colnames(data)) {
+    
+        if (col != target_col) {
+      
+            #Creamos una tabla de frecuencias para esa columna solo con las filas de la clase actual:
+        tabla <- table(subconjunto[[col]])
+        
+        #Aplicamos el suavizado de Laplace que suma 1 a cada frecuencua para evitar ceros
+        probs <- (tabla + 1) / (sum(tabla) + length(unique(data[[col]])))
+        
+        #Guardamos las probabilidades condicionales de ese atributo para esta clase
+        probs_atributos[[col]] <- probs
+      }
+    }
+    
+    #Guardamos en la lista del modelo la probabilidad a prioti y las condcionales para cada variable
+    modelo[[as.character(clase)]] <- list(
+      prob = prob_clase,
+      atributos = probs_atributos
+    )
+  }
+  
+  modelo$target <- target_col
+  return(modelo)
+}
+
+
+```
+
+#### Predicción con Naive Bayes
+
+```{r}
+# Función para predecir una fila con el modelo entrenado
+#Predice la clase para una nueva observacion usando log-probabilidades
+predecir_naive_bayes <- function(modelo, nueva_obs) {
+  target <- modelo$target
+  clases <- names(modelo)[names(modelo) != "target"]
+  
+  #Donde almacenamos el log-probabilidad total para cada clase
+  log_probs <- c()
+  
+  #Empieza a recorrer clases y toma la log de la probabilidad a priori
+  for (clase in clases) {
+    log_prob <- log(modelo[[clase]]$prob)
+    
+    #Recorremos cada variable de la observacion y tomamos su valor
+    for (col in names(nueva_obs)) {
+      valor <- as.character(nueva_obs[[col]])
+      
+      #Busca la probabilidad condicional de ese valor dado la clase
+      if (col %in% names(modelo[[clase]]$atributos)) {
+        probs_col <- modelo[[clase]]$atributos[[col]]
+        prob_valor <- probs_col[valor]
+        
+        #Si ese valor no existia en el entrenamiento aplicamos Laplace para asignarle una probabilidad pequeña
+        if (is.na(prob_valor)) {
+          prob_valor <- 1 / (sum(probs_col) + length(probs_col))  # Laplace para valor desconocido
+        }
+        #Acumula la log-probabilidad total
+        log_prob <- log_prob + log(prob_valor)
+      }
+    }
+    #Guardamos la log-probabilidad total para esa clase
+    log_probs[clase] <- log_prob
+  }
+  #Devuelve la clase con mayor log-probabilidad
+  clase_predicha <- names(which.max(log_probs))
+  return(clase_predicha)
+}
+
+
+```
+
+#### Evaluación del modelo
+
+```{r}
+# Predicciones en TEST
+pred_test_manual <- sapply(1:nrow(test), function(i) {
+  predecir_naive_bayes(modelo_naive_manual, test[i, ])
+})
+
+# Evaluación
+confusion_test <- confusionMatrix(factor(pred_test_manual, levels = levels(test$NObeyesdad)),
+                                  test$NObeyesdad)
+print(confusion_test)
+
+```
 
 
 
