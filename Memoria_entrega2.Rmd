@@ -791,7 +791,6 @@ Nos demuestra el error frente al número de arboles durante la creación de los 
 Como era de esperar, al principio tiene un error muy alto que luego se va suavizando, pero una de ellas, Overweight_Level_II parece ser que su error no baja. Esto nos da a entender que es la variable más problematica para predecir y que no es fácil para el algoritmo prodecir su valor.
 
 ```{r}
-# ——— DEBUG: compara clases de cada columna ———
 # Calcula la clase (tipo) de cada variable
 train_classes <- sapply(df.train, class)
 test_classes  <- sapply(df.test,  class)
@@ -803,28 +802,13 @@ class_comparison <- data.frame(
   test     = unname(test_classes),
   stringsAsFactors = FALSE
 )
-print(class_comparison)
 
-# ——— DEBUG: comprueba niveles de los factores ———
 # Solo para las variables que deberían ser factores
 factor_vars <- c("Gender","family_history_with_overweight","FAVC","MTRANS",
                  "CAEC","SMOKE","SCC","NObeyesdad")
-# Para cada factor, imprime niveles en train vs test
-for(v in factor_vars) {
-  cat("Variable:", v, "\n")
-  cat("  Niveles en train:", paste(levels(df.train[[v]]), collapse = ", "), "\n")
-  cat("  Niveles en test: ", paste(levels(df.test[[v]]),  collapse = ", "), "\n\n")
-}
 
-# ——— DEBUG: busca NAs introducidos por re-factoring ———
 na_counts <- sapply(df.test, function(x) sum(is.na(x)))
-print(data.frame(variable = names(na_counts), nas = na_counts))
 
-```
-
-
-
-```{r}
 # Seleccionar columnas
 df.train <- train %>%
   dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad, Age, FCVC, NCP, CAEC, SMOKE, CH2O, SCC, TUE, CALC)
@@ -851,14 +835,6 @@ for(v in names(df.train)) {
     df.test[[v]] <- as.logical(df.test[[v]])
   }
 }
-
-# Verifica que ya coincidan
-#mismatch <- sapply(names(df.train), function(v) {
-#  paste(class(df.train[[v]]), collapse = "/") != paste(class(df.test[[v]]), collapse="/")
-#})
-#if (any(mismatch)) {
-#  warning("Siguen sin coincidir clases en: ", paste(names(mismatch)[mismatch], collapse=", "))
-#}
 
 # Predecir y mostrar matriz de confusión
 prediction.rf <- predict(rf, df.test)
@@ -935,7 +911,7 @@ print(confusion_test)
 Al comparar el modelo Naive Bayes implementando la función propia de R (naivebayes) con la función programada podemos observar una diferencia muy significativa en el rendimiento. El modelo de R logra una precisión del 72,5% y un coeficiente Kappa de 0,6775, mientras que el modelo manual apenas alcanza un 11,6% de acierto y un Kappa practicamente nulo por lo que su rendimiento no supera al azar. En el modelo automático, hay clases que hemos observado anteriormente se clasifican con gran precisión, mientras que en el modelo manual casi ninguna clase se identifica correctamente, predominan las predicciones erróneas concentradas en la clase Peso Normal. Esta diferencia se debe a que el modelo de R optimiza automáticamente los cálculos, maneja variables de forma más robusta y controla mas la distribución y el suavizado.
 
 
-#Comparación de Modelos
+# Comparación de Modelos
 
 En este bloque vamos a determinar cuál de todos es el más adecuado, en cuantro a métricas, para predecir el nivel de obesidad de forma más precisa.
 
