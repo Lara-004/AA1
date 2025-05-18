@@ -764,4 +764,21 @@ confusionMatrix(pred_classes, test$NObeyesdad)
 
 Tras aplicarlo, obtenemos una exactitud del 72,5% y un índice Kappa de 0,6775, lo que significa que el modelo tiene una buena capacidad para predecir las clases de obesidad. De hecho, Obesidad de tipo lll, está identificada con una precisión perfecta, sin embargo las clases que peor se ajustan son Sobrepeso Nivel l con sensibilidad del 50% y Sobrepeso Nivel ll con sensibilidad del 54%. Esto tiene sentido si nos fijamos en el análisis anterior usando el método Bagging, en el cual Sobrepeso Nivel l también era la que peor se ajustaba probablemente también por un solapamiento con Sobrepeso Nivel ll.
 
+A continuación, hemos implementado manualmente el algoritmo Naive Bayes y asi comprender su funcionamiento interno. Este modelo programado nos sirve como base conceptual pero para la predicción debemos usar el de la función de R. Ya que el rendimiento ha sido muy bajo, porque no incluye optimizaciones, control de errores o transformación de variables que si incluye la función de R:
+
+```{r}
+# Predicciones en TEST
+pred_test_manual <- sapply(1:nrow(test), function(i) {
+  predecir_naive_bayes(modelo_naive_manual, test[i, ])
+})
+
+# Evaluación
+confusion_test <- confusionMatrix(factor(pred_test_manual, levels = levels(test$NObeyesdad)),
+                                  test$NObeyesdad)
+print(confusion_test)
+
+```
+
+
+Al comparar el modelo Naive Bayes implementando la función propia de R (naivebayes) con la función programada podemos observar una diferencia muy significativa en el rendimiento. El modelo de R logra una precisión del 72,5% y un coeficiente Kappa de 0,6775, mientras que el modelo manual apenas alcanza un 11,6% de acierto y un Kappa practicamente nulo por lo que su rendimiento no supera al azar. En el modelo automático, hay clases que hemos observado anteriormente se clasifican con gran precisión, mientras que en el modelo manual casi ninguna clase se identifica correctamente, predominan las predicciones erróneas concentradas en la clase Peso Normal. Esta diferencia se debe a que el modelo de R optimiza automáticamente los cálculos, maneja variables de forma más robusta y controla mas la distribución y el suavizado.
 
