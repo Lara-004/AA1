@@ -33,6 +33,13 @@ suppressPackageStartupMessages(library(randomForest))
 suppressPackageStartupMessages(library(gridExtra))
 suppressPackageStartupMessages(library(xgboost))
 suppressPackageStartupMessages(library(naivebayes))
+suppressPackageStartupMessages(library(fastDummies))
+suppressPackageStartupMessages(library(pROC))
+suppressPackageStartupMessages(library(recipes))
+suppressPackageStartupMessages(library(mlbench))
+suppressPackageStartupMessages(library(MASS))
+suppressPackageStartupMessages(library(MVN))
+suppressPackageStartupMessages(library(lmtest))
 ```
 
 ```{r echo = FALSE}
