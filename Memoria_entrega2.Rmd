@@ -40,6 +40,9 @@ suppressPackageStartupMessages(library(mlbench))
 suppressPackageStartupMessages(library(MASS))
 suppressPackageStartupMessages(library(MVN))
 suppressPackageStartupMessages(library(lmtest))
+suppressPackageStartupMessages(library(tibble))
+suppressPackageStartupMessages(library(biotools))
+suppressPackageStartupMessages(library(MLmetrics))
 ```
 
 ```{r echo = FALSE}
@@ -280,10 +283,10 @@ Por lo que podemos concluir que es un modelo que ajusta bastatnte bien nuestros 
 A continuación vamos a comparalo con el k-NN que hemos hecho manualmente.
 
 ```{r}
-source("Memoria_Funciones.Rmd")
+source("Memoria_Funciones.R")
 
-train.df_x <- train.df |> dplyr::select(is.numeric)
-test.df_x <- test.df |> dplyr::select(is.numeric)
+train.df_x <- train.df |> dplyr::select(where(is.numeric))
+test.df_x <- test.df |> dplyr::select(where(is.numeric))
 
 pred_manual <- mi_knn(train = train.df_x, test = test.df_x, cl = train.df$NObeyesdad, k = 5)
 table(Predicho = pred_manual, Real = test.df$NObeyesdad)
@@ -472,7 +475,7 @@ $$
 $$
 
 ```{r}
-source("Memoria_Funciones.Rmd")
+source("Memoria_Funciones.R")
 train_num <- train.df |> dplyr::select(where(is.numeric))
 test_num <- test.df |> dplyr::select(where(is.numeric))
 
@@ -624,6 +627,7 @@ cf <- confusionMatrix(prediction.rf, real.rf)
 print(cf)
 
 ```
+
 
 En el conjunto de entrenamiento, el modelo mostraba un rendimiento casi excelente, con un accuracy del 95%o más, y siendo los errores mínimos. Sin embargo, al ajustarlo al conjunto de prueba, aunque el desempeño siga siendo alto podemos observar una ligera caída y aunque sigue sugiriendo que generaliza bien, podría ester sobreajustando brevemente.
 
@@ -787,14 +791,80 @@ Nos demuestra el error frente al número de arboles durante la creación de los 
 Como era de esperar, al principio tiene un error muy alto que luego se va suavizando, pero una de ellas, Overweight_Level_II parece ser que su error no baja. Esto nos da a entender que es la variable más problematica para predecir y que no es fácil para el algoritmo prodecir su valor.
 
 ```{r}
-# sobre la partición de prueba
+# ——— DEBUG: compara clases de cada columna ———
+# Calcula la clase (tipo) de cada variable
+train_classes <- sapply(df.train, class)
+test_classes  <- sapply(df.test,  class)
+
+# Junta en un data.frame para ver las diferencias
+class_comparison <- data.frame(
+  variable = names(train_classes),
+  train    = unname(train_classes),
+  test     = unname(test_classes),
+  stringsAsFactors = FALSE
+)
+print(class_comparison)
+
+# ——— DEBUG: comprueba niveles de los factores ———
+# Solo para las variables que deberían ser factores
+factor_vars <- c("Gender","family_history_with_overweight","FAVC","MTRANS",
+                 "CAEC","SMOKE","SCC","NObeyesdad")
+# Para cada factor, imprime niveles en train vs test
+for(v in factor_vars) {
+  cat("Variable:", v, "\n")
+  cat("  Niveles en train:", paste(levels(df.train[[v]]), collapse = ", "), "\n")
+  cat("  Niveles en test: ", paste(levels(df.test[[v]]),  collapse = ", "), "\n\n")
+}
+
+# ——— DEBUG: busca NAs introducidos por re-factoring ———
+na_counts <- sapply(df.test, function(x) sum(is.na(x)))
+print(data.frame(variable = names(na_counts), nas = na_counts))
+
+```
+
+
+
+```{r}
+# Seleccionar columnas
+df.train <- train %>%
+  dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad, Age, FCVC, NCP, CAEC, SMOKE, CH2O, SCC, TUE, CALC)
+
 df.test <- test %>%
-      dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad, Age, FCVC, NCP, CAEC, SMOKE, CH2O, SCC, TUE, CALC)
-#df.test$NObeyesdad=as.factor(df.test$NObeyesdad)
+  dplyr::select(Gender, Height, Weight, family_history_with_overweight, FAVC, FAF, MTRANS, NObeyesdad, Age, FCVC, NCP, CAEC, SMOKE, CH2O, SCC, TUE, CALC)
+
+# Asegura clases idénticas
+for(v in names(df.train)) {
+  cls <- class(df.train[[v]])
+  if (cls == "factor") {
+    # refactoriza usando exactamente los mismos niveles
+    df.test[[v]] <- factor(
+      as.character(df.test[[v]]),
+      levels = levels(df.train[[v]])
+    )
+  } else if (cls == "numeric") {
+    df.test[[v]] <- as.numeric(df.test[[v]])
+  } else if (cls == "integer") {
+    df.test[[v]] <- as.integer(df.test[[v]])
+  } else if (cls == "character") {
+    df.test[[v]] <- as.character(df.test[[v]])
+  } else if (cls == "logical") {
+    df.test[[v]] <- as.logical(df.test[[v]])
+  }
+}
+
+# Verifica que ya coincidan
+#mismatch <- sapply(names(df.train), function(v) {
+#  paste(class(df.train[[v]]), collapse = "/") != paste(class(df.test[[v]]), collapse="/")
+#})
+#if (any(mismatch)) {
+#  warning("Siguen sin coincidir clases en: ", paste(names(mismatch)[mismatch], collapse=", "))
+#}
+
+# Predecir y mostrar matriz de confusión
 prediction.rf <- predict(rf, df.test)
-#clase.pred.rf=ifelse(prediction.rf>0.5)
-cf <- confusionMatrix(as.factor(prediction.rf), as.factor(df.test$NObeyesdad))
+cf <- confusionMatrix(prediction.rf, df.test$NObeyesdad)
 print(cf)
+
 ```
 
 Vamos a ver la matriz de confusión. 
@@ -863,4 +933,151 @@ print(confusion_test)
 
 
 Al comparar el modelo Naive Bayes implementando la función propia de R (naivebayes) con la función programada podemos observar una diferencia muy significativa en el rendimiento. El modelo de R logra una precisión del 72,5% y un coeficiente Kappa de 0,6775, mientras que el modelo manual apenas alcanza un 11,6% de acierto y un Kappa practicamente nulo por lo que su rendimiento no supera al azar. En el modelo automático, hay clases que hemos observado anteriormente se clasifican con gran precisión, mientras que en el modelo manual casi ninguna clase se identifica correctamente, predominan las predicciones erróneas concentradas en la clase Peso Normal. Esta diferencia se debe a que el modelo de R optimiza automáticamente los cálculos, maneja variables de forma más robusta y controla mas la distribución y el suavizado.
+
+
+#Comparación de Modelos
+
+En este bloque vamos a determinar cuál de todos es el más adecuado, en cuantro a métricas, para predecir el nivel de obesidad de forma más precisa.
+
+Para abordar el problema de clasificación del nivel de obesidad, hemos seleccionado tres familias de métodos que cubren, desde nuestro punto de vista, desde la sencillez y transparencia hasta la capacidad predictiva más avanzada.
+
+Estos 3 modelos, que son los que mejores resultados en cuanto a rendimiento principalmente, son: k-Nearest Neighbors, Bagging y Random Forest. Cada uno basado en similitud, en ensamblado puro y en ensamblado con selección de variables.
+
+Hemos escogido estos tres enfoques porque, en conjunto, cubren muy bien el compromiso entre sencillez, interpretabilidad y potencia predictiva
+
+Vamos a empezar explicando en profundidad cada modelo.
+
+## k-nn
+
+### Por qué lo elegimos
+
+- Es un método “no paramétrico” que no asume ninguna distribución de los datos.
+
+- Clasifica según las observaciones más cercanas en el espacio de características, por lo que es fácilmente interpretable
+
+
+### Ventajas
+
+- Transparencia: fácil de entender y de implementar.
+
+- Flexibilidad: maneja directamente problemas multiclase sin modificaciones.
+
+- Poco ajuste de hiperparámetros: solo requiere elegir k (el número de vecinos).
+
+### Desventajas
+
+- Sensibilidad a la escala: requiere normalizar o estandarizar previamente.
+
+- Coste computacional: crece con el tamaño del conjunto de entrenamiento.
+
+- Propenso a sobreajuste si k es muy pequeño
+
+## Bagging
+
+### Por qué lo elegimos
+
+- Permite visualizar el efecto de cada árbol a través de predicciones OOB (out-of-bag).
+
+### Ventajas
+
+- Reducción de varianza: disminuye el sobreajuste
+
+- Fácil de implementar sin librerías especializadas.
+
+- Visibilidad OOB: se evalúa el rendimiento usando sólo los datos que no entraron en cada muestra.
+
+### Desventajas
+
+- No reduce correlación entre árboles: todos se entrenan con todas las variables, por lo que pueden ser muy similares.
+
+## Random Forest
+
+### Por qué lo elegimos
+
+- Mejora al bagging añadiendo selección aleatoria de variables en cada división.
+
+- Combina reducción de varianza con menor correlación entre árboles.
+
+### Ventajas
+
+- Muy buena generalización sin excesivo ajuste de hiperparámetros.
+
+- Estimación OOB incorporada para validación interna.
+
+- Importancia de variables: detecta automáticamente qué características aportan más.
+
+### Desventajas
+
+- Menos interpretable que un árbol único o k-NN muy simple.
+
+- Coste computacional superior al de un solo árbol, aunque paralelo.
+
+## Rendimientos de los modelos
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+predictoras <- setdiff(names(train), "NObeyesdad")
+df_test_raw <- test[ , predictoras]
+
+for(col in predictoras) {
+  if (is.factor(train[[col]])) {
+    df_test_raw[[col]] <- factor(df_test_raw[[col]], levels = levels(train[[col]]))
+  }
+}
+
+# Predicciones
+pred_knn <- predict(fit.knn, newdata = test.df)
+preds_mat <- sapply(modelo_bagging$modelos, function(arbol) {
+  predict(arbol, newdata = df_test_raw, type = "class")
+})
+pred_bagging <- apply(preds_mat, 1, function(votos) {
+  names(which.max(table(votos)))
+})
+pred_bagging <- factor(pred_bagging, levels = levels(train$NObeyesdad))
+pred_rf <- predict(rf, newdata = df_test_raw)
+
+# Calcula las matrices de confusión
+cm_knn     <- confusionMatrix(pred_knn,     test.df$NObeyesdad)
+cm_bagging <- confusionMatrix(pred_bagging, test$NObeyesdad)
+cm_rf      <- confusionMatrix(pred_rf,      test.df$NObeyesdad)
+
+# Función para extraer métricas
+get_metrics <- function(cm) {
+  c(
+    Accuracy    = unname(cm$overall["Accuracy"]),
+    Kappa       = unname(cm$overall["Kappa"]),
+    Sensitivity = mean(cm$byClass[ , "Sensitivity"], na.rm = TRUE),
+    Specificity = mean(cm$byClass[ , "Specificity"], na.rm = TRUE)
+  )
+}
+
+# Métricas de cada modelo
+metrics_knn     <- get_metrics(cm_knn)
+metrics_bagging <- get_metrics(cm_bagging)
+metrics_rf      <- get_metrics(cm_rf)
+
+comparativa <- bind_rows(
+  as.data.frame(t(metrics_knn))     %>% mutate(Modelo = "k-NN (k = 5)"),
+  as.data.frame(t(metrics_bagging)) %>% mutate(Modelo = "Bagging manual (500)"),
+  as.data.frame(t(metrics_rf))      %>% mutate(Modelo = "Random Forest (500)")
+)
+
+comparativa <- as.data.frame(comparativa)[ , c("Modelo", "Accuracy", "Kappa",  "Sensitivity", "Specificity")]
+
+kable(comparativa)
+```
+
+
+Vamos a comentar la tabla.
+
+- k-nn: Obtiene un accuracy del 83.6 % y un Kappa de 0.81, lo cual es razonable para un modelo tan simple. La especificidad es muy alta (97.3 %), indicando que casi nunca etiqueta erróneamente como positiva una observación que no lo es. Sin embargo, la sensibilidad es algo más baja (82.1 %), lo que significa que falla en captar cerca del 18 % de las verdaderas instancias de cada clase.
+
+- Bagging: Mejora el accuracy hasta el 88.6 % (+5 puntos frente a k-NN) y el Kappa a 0.87 (el ensamblado reduce significativamente el sesgo de k-NN). La sensibilidad sube a 87.99 % y la especificidad a 98.1 %. El modelo no sólo acierta más, sino que equilibra mejor la detección de positivos y la evitación de falsos positivos.
+
+- Random Forest: Lidera con un accuracy del 94.8 % y un Kappa de 0.94, reflejando una capacidad predictiva casi perfecta. La sensibilidad alcanza el 94.6 %, capturando casi todas las verdaderas instancias, y la especificidad el 99.2 %, prácticamente eliminando falsos positivos.
+
+En conclusión, Random Forest es el más equilibrado y potente, Bagging se queda unos puntos atrás y k-NN a pesar de ser el más rápido e iterpretable, sufre de sensibilidad.
+
+Es por eso que el modelo más potente y del cual obtenemos un rendimiento y una capacidad predictiva casi perfecta es el Random Forest.
+
+
 
