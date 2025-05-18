@@ -233,6 +233,85 @@ predecir_naive_bayes <- function(modelo, nueva_obs) {
 
 #### Evaluación del modelo
 
+#### Boosting 
 
+copy_train <- train
+copy_test <- test
+copy_train$y <- as.numeric(as.factor(copy_train$NObeyesdad)) - 1
+copy_test$y <- as.numeric(factor(copy_test$NObeyesdad, levels = levels(as.factor(copy_train$NObeyesdad)))) - 1
+
+# Número de clases
+levels_lbl <- levels(as.factor(copy_train$NObeyesdad))
+K <- length(levels_lbl)
+
+# Pasar de factores a numéricos
+tabla_preds <- setdiff(names(copy_train), c("NObeyesdad", "y"))
+copy_train[tabla_preds] <- lapply(copy_train[tabla_preds], function(z) if(is.numeric(z)) z else as.numeric(as.factor(z)))
+copy_test[tabla_preds]<- lapply(copy_test[tabla_preds],  function(z) if(is.numeric(z)) z else as.numeric(as.factor(z)))
+
+df_train <- copy_train[c(tabla_preds, "y")]
+df_train$y <- factor(df_train$y, levels = 0:(K-1))
+df_test <- copy_test[tabla_preds]
+
+# Función AdaBoost
+adaboost_train_rpart <- function(df, M) {
+  n <- nrow(df)                 # Numero de observaciones
+  w <- rep(1/n, n)              # Pesos iniciales iguales para todos
+  stumps <- vector("list", M)   # Lista para almacenar los árboles
+  alphas <- numeric(M)          # Vector para los coeficientes alpha
+  K <- length(levels(df$y))     # Número de clases
+  
+  # Entrenamiento de un árbol de profundidad 1
+  for (m in seq_len(M)) {
+    stump <- rpart(y ~ ., data = df, weights = w, control = rpart.control(maxdepth = 1, cp = 0, minsplit = 2))
+    
+    # Predicciones en el conjunto de train
+    pred_factor <- predict(stump, df, type = "class")
+    pred_num <- as.numeric(pred_factor) - 1
+    y_num <- as.numeric(df$y) - 1
+    
+    # Error ponderado
+    err <- sum(w * (pred_num != y_num))
+    err <- pmin(pmax(err, 1e-10), 1 - 1e-10)
+    
+    # Coeficiente alpha ajustado para multiclase
+    alphas[m] <- log((1 - err)/err) + log(K - 1)
+    
+    # Actualizar pesos
+    w <- w * exp(alphas[m] * (pred_num != y_num))
+    w <- w / sum(w)
+    
+    # Guardar el árbol entrenado
+    stumps[[m]] <- stump
+  }
+  list(stumps = stumps, alphas = alphas, K = K)
+}
+
+# Función para predecir con el modelo AdaBoost entrenado
+adaboost_predict_rpart <- function(model, df) {
+  M <- length(model$alphas)        # Número de árboles entrenados
+  n <- nrow(df)                    # Número de observaciones a predecir
+  scores <- matrix(0, n, model$K)  # Matriz de puntuaciones por clase
+  
+  for (m in seq_len(M)) {
+    # Predicción de cada árbol
+    pred_factor <- predict(model$stumps[[m]], df, type = "class")
+    pred_num <- as.numeric(pred_factor) - 1
+    # Acumular la "contrubución" del arbol a la puntuación de cada clase
+    for (k in 0:(model$K - 1)) {scores[, k+1] <- scores[, k+1] + model$alphas[m] * (pred_num == k)}
+  }
+  # La predicción es la clase con más puntuaciones
+  apply(scores, 1, which.max) - 1
+}
+
+# Tiempo
+time_taken <- system.time({model_ab <- adaboost_train_rpart(df_train, M = 10)})
+# cat(sprintf("Tiempo de entrenamiento: %.2f s\n", time_taken[3]))
+
+# Predicciones y accuracy
+datos_pred <- df_test
+preds <- adaboost_predict_rpart(model_ab, datos_pred)
+accuracy <- mean(preds == copy_test$y) * 100
+cat(sprintf("Accuracy en test: %.2f%%\n", accuracy))
 
 
