@@ -282,7 +282,7 @@ pred_manual <- mi_knn(train = train.df_x, test = test.df_x, cl = train.df$NObeye
 table(Predicho = pred_manual, Real = test.df$NObeyesdad)
 
 # Precisión manual
-precision_manual <- mean(pred_manual == test.df$NObeyesdad)
+knn_manual <- mean(pred_manual == test.df$NObeyesdad)
 ```
 
 ```{r}
@@ -441,13 +441,10 @@ ggplot(proj, aes(x = LD6, fill = Clase)) +
 Con esta nos pasa lo mismo que con el discriminante anterior. A continuación vamos a ver las medidas que necesitamos para poder compara los modelos.
 
 ```{r}
-library(caret)  # Si no está instalado: install.packages("caret")
-
-# Convertir a factor si no lo es
 predicciones <- as.factor(pred_lda$class)
 test.df$NObeyesdad <- as.factor(test.df$NObeyesdad)
 
-# Calcular métricas
+# Calculamos las métricas
 resultados <- confusionMatrix(predicciones, test.df$NObeyesdad, positive = "ClasePositiva")  # Especificar la clase positiva
 print(resultados)
 ```
@@ -460,7 +457,35 @@ Pro otro lado, tenemos la tasa de verdaderos negativos, que es incluso mejor, co
 
 Por otro lado los valores predichos, tanto positivos como negativos nos dan bastante altos, dandonos bastante explicabilidad a los datos. Por último tenemos la precisión balancead inidcandonos la exactitud con la que se predice en cada clase, por lo que se ve es bastante alta, lo que nos dice que es bastante buena.
 
-Sin embargo, aunque tengamos un muy buen modeo de clasificación no cumple el supuesto de normalidad multivariante que tiene que cumplir para poder aplicar lda, lo que nos da un modelo bastante bueno para compara con otros.
+Sin embargo, aunque tengamos un muy buen modeo de clasificación no cumple el supuesto de normalidad multivariante que tiene que cumplir para poder aplicar lda, lo que nos da un modelo bastante bueno para compara con otros. 
+
+Para concluir, vamos a comparar el modelo que hemos creado a manos siguiendo la siguiente fórmula:
+$$
+\delta_{c}(\mathbf{x})=\mathbf{x}^{t} \Sigma^{-1}\mu_{c} -\frac{1}{2}\mu_{c}^{t}\Sigma^{-1}\mu_{c} + \log(P(Y=c))
+$$
+
+```{r}
+source("LDA.R")
+train_num <- train.df |> dplyr::select(where(is.numeric))
+test_num <- test.df |> dplyr::select(where(is.numeric))
+
+# Entrena el modelo
+modelo_lda <- mi_lda(X = train_num, y = train.df$NObeyesdad)
+
+# Haz predicciones
+pred_manual <- predict(modelo_lda, test_num)
+
+# Matriz de confusión
+table(Predicho = pred_manual, Real = test.df$NObeyesdad)
+
+# Precisión manual
+lda_manual <- mean(pred_manual == test.df$NObeyesdad)
+```
+```{r}
+print(confusion)
+```
+
+Como podemos ver en la comparación, el modelo hecho a mano predice de forma similar al que hemos hecho con lda de r.
 
 ### Árboles de decisión
 
