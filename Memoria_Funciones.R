@@ -21,6 +21,118 @@ suppressPackageStartupMessages(library(gridExtra))
 suppressPackageStartupMessages(library(xgboost))
 suppressPackageStartupMessages(library(naivebayes))
 
+# Knn
+
+# Función k-NN con distancia euclides
+mi_knn <- function(train, test, cl, k = 5) {
+  # Verificamos que las dimensiones estan bien
+  if(nrow(train) != length(cl)) {
+    stop("El número de filas de train debe coincidir con la longitud de cl")
+  }
+  
+  # Convertir a matrices para evitar problemas con data frames
+  train <- as.matrix(train)
+  test <- as.matrix(test)
+  cl <- as.vector(cl)
+  
+  # Comprobamos que train y test tienen el mismo número de columnas
+  if(ncol(train) != ncol(test)) {
+    stop("train y test deben tener el mismo número de columnas")
+  }
+  
+  # Calculamos las distancias euclideas
+  distancias <- sqrt(outer(
+    rowSums(train^2), 
+    rowSums(test^2), 
+    "+"
+  ) - 2 * tcrossprod(train, test))
+  
+  # Buscamos lo k, vecinos más cercanos
+  vecinos <- apply(distancias, 2, function(x) order(x)[1:k])
+  
+  # Despues de buscarlo predecimos las clases más frecuentes.
+  predicciones <- apply(vecinos, 2, function(indices) {
+    clases_vecinos <- cl[indices]
+    names(which.max(table(clases_vecinos)))
+  })
+  
+  return(predicciones)
+}
+
+
+# Analisis Discriminante Lineal
+mi_lda <- function(X, y) {
+  # Convertir a matriz si es necesario
+  if (!is.matrix(X)) X <- as.matrix(X)
+  if (is.factor(y)) y <- as.character(y)
+  
+  classes <- unique(y)
+  n_classes <- length(classes)
+  n_features <- ncol(X)
+  
+  # 1. Calcular probabilidades a priori
+  priors <- table(y)/length(y)
+  
+  # 2. Calcular medias por clase
+  means <- matrix(0, nrow = n_classes, ncol = n_features)
+  for (i in 1:n_classes) {
+    means[i,] <- colMeans(X[y == classes[i],, drop = FALSE])
+  }
+  rownames(means) <- classes
+  
+  # 3. Calcular matriz de covarianza común
+  cov_matrix <- matrix(0, nrow = n_features, ncol = n_features)
+  for (i in 1:n_classes) {
+    X_centered <- scale(X[y == classes[i],], center = means[i,], scale = FALSE)
+    cov_matrix <- cov_matrix + crossprod(X_centered)
+  }
+  cov_matrix <- cov_matrix/(nrow(X) - n_classes)
+  cov_inv <- solve(cov_matrix)
+  
+  # Estructura del modelo
+  model <- list(
+    classes = classes,
+    priors = priors,
+    means = means,
+    cov_inv = cov_inv,
+    n_features = n_features
+  )
+  class(model) <- "mi_lda_model"
+  return(model)
+}
+
+predict.mi_lda_model <- function(object, newdata, ...) {
+  if (!is.matrix(newdata)) newdata <- as.matrix(newdata)
+  
+  # Asegurar que newdata tenga las mismas características
+  if (ncol(newdata) != object$n_features) {
+    stop("Número de características no coincide")
+  }
+  
+  # Calcular términos de la función discriminante
+  n <- nrow(newdata)
+  n_classes <- length(object$classes)
+  discriminants <- matrix(0, nrow = n, ncol = n_classes)
+  
+  for (i in 1:n_classes) {
+    # Término 1: x^T Σ^{-1} μ_c
+    term1 <- newdata %*% object$cov_inv %*% object$means[i,]
+    
+    # Término 2: (1/2) μ_c^T Σ^{-1} μ_c (escalar para cada clase)
+    term2 <- 0.5 * drop(object$means[i,] %*% object$cov_inv %*% object$means[i,])
+    
+    # Término 3: log(P(Y=c)) (escalar para cada clase)
+    term3 <- log(object$priors[i])
+    
+    # Combinar términos (R hace el broadcasting correctamente)
+    discriminants[,i] <- term1 - term2 + term3
+  }
+  
+  # Predecir la clase con mayor discriminante
+  object$classes[max.col(discriminants)]
+}
+
+
 #Bagging
 
 #### Definimos los niveles manualmente
