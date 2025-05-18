@@ -416,7 +416,7 @@ Antes de comenzar con el código vamos a detallar los pasos que seguimos para re
 
 3.  Evaluación del modelo
 
-    · Aplicamos el modelo a test prediciendo la clase de obesidad para cada observacion.
+    · Aplicamos el modelo a test en el archivo de la práctica prediciendo la clase de obesidad para cada observacion.
 
     · Comparamos las clases predichas con las reales, construyendo la matriz de confusión, la cual muestra cuantas veces el modelo acertó o se equivocó al predecir cada clase, a partir de la matriz ontenemos distintas métricas.
 
@@ -522,23 +522,6 @@ predecir_naive_bayes <- function(modelo, nueva_obs) {
 
 ```
 
-#### Evaluación del modelo
 
-```{r}
-# Aseguramos niveles iguales entre predicciones y etiquetas reales
-niveles_correctos <- levels(as.factor(train$NObeyesdad))  # niveles del train que entrenó el modelo
 
-pred_test_manual <- factor(pred_test_manual, levels = niveles_correctos)
-test$NObeyesdad <- factor(test$NObeyesdad, levels = niveles_correctos)
 
-# Predicciones en TEST
-pred_test_manual <- sapply(1:nrow(test), function(i) {
-  predecir_naive_bayes(modelo_naive_manual, test[i, ])
-})
-
-# Evaluación
-confusion_test <- confusionMatrix(factor(pred_test_manual, levels = levels(test$NObeyesdad)),
-                                  test$NObeyesdad)
-print(confusion_test)
-
-```
