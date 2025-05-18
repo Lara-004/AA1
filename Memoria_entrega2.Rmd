@@ -568,15 +568,6 @@ plot(rf)
 
 La línea continua muestra el error promedio general, y el resto de líneas discontinuas son los errores según el tipo de obesidad. Algunos errores son muy cercanos a 0, podemos deducir que el rosa (el más bajo) corresponde a Obesidad Tipo 1 ya que su error era de era del 0% y el más elevado a Sobrepeso Nivel 1, ya que su error era el más alto. El error disminuye de manera rápida en las primeras iteraciones y a partir de los 200 árboles se estabiliza, esto demuestra una buena capacidad de generalización del modelo.
 
-```{r}
-# sobre la partición de prueba
-#df.test <- train %>%
-      #dplyr::select(Gender, Age, Height, Weight, family_history_with_overweight, FAVC, FCVC, NCP, CAEC, SMOKE, SCC, FAF, TUE, CH2O, CALC, MTRANS, #NObeyesdad)
-#prediction.rf <- predict(rf, df.test,type="prob")[,2]
-#clase.pred.rf=ifelse(prediction.rf>0.5,"yes","no")
-#cf <- confusionMatrix(as.factor(clase.pred.rf), as.factor(df.test$NObeyesdad),positive="yes")
-#print(cf)
-```
 
 A continuación, identificamos las variables predictoras que más influyen en las decisiones del modelo:
 
@@ -607,6 +598,28 @@ Al representar graficamente las Mean Decrease Accurancy y Mean Decrease Gini pod
 ```{r}
 MDSplot(rf,as.factor(train$NObeyesdad),k=3)
 ```
+
+```{r}
+df.test <- test %>%
+  dplyr::select(Gender, Age, Height, Weight,
+                family_history_with_overweight, FAVC, FCVC, NCP,
+                CAEC, SMOKE, SCC, FAF, TUE, CH2O, CALC, MTRANS)
+prediction.rf <- predict(rf, df.test)
+
+niveles_comunes <- union(levels(prediction.rf), levels(test$NObeyesdad))
+
+prediction.rf <- factor(prediction.rf, levels = niveles_comunes)
+real.rf <- factor(test$NObeyesdad, levels = niveles_comunes)
+
+cf <- confusionMatrix(prediction.rf, real.rf)
+print(cf)
+
+```
+
+En el conjunto de entrenamiento, el modelo mostraba un rendimiento casi excelente, con un accuracy del 95%o más, y siendo los errores mínimos. Sin embargo, al ajustarlo al conjunto de prueba, aunque el desempeño siga siendo alto podemos observar una ligera caída y aunque sigue sugiriendo que generaliza bien, podría ester sobreajustando brevemente.
+
+En cuanto a la medidas de rendimiento, indican que el modelo clasifica correctamente la mayoria de categorías, destacando obesidad de nivel 3, que alcanza valores perfectos de sensibilidad, especificidad y precisión. Sin embargo, clases como Sobre Peso de Nivel 2 y Peso Normal, presentan menor sensibilidad y precisión, por lo que el modelo tiene más dificultad para distinguir entre clases cercanaso con menos representación. En conjunto, balanced accuracy y F1_score confirman un rendimiento global sólido, aunque con margen de mejora en clases específicas.
+
 Ahora vamos a comparar el método bagging con la función propia de R, con el método programado a continuación:
 
 Cargamos la función desde el archivo de funciones:
