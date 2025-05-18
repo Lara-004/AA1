@@ -10,7 +10,7 @@ output:
       collapsed: true
 ---
 
-```{r echo=FALSE, warning=FALSE}
+```{r echo=FALSE, warning=FALSE, echo = FALSE}
 suppressPackageStartupMessages(library(readr))
 suppressPackageStartupMessages(library(ggplot2))
 suppressPackageStartupMessages(library(dplyr))
@@ -35,13 +35,12 @@ suppressPackageStartupMessages(library(xgboost))
 suppressPackageStartupMessages(library(naivebayes))
 ```
 
-```{r}
+```{r echo = FALSE}
 # Leer el dataset correctamente
-obesidad <- read.csv("C:/Users/carme/Downloads/ObesityDataSet.csv")
+obesidad <- read.csv("C:/Users/laram/Downloads/archive (3)/ObesityDataSet.csv")
 
 # Ver las dimensiones del dataset
 data <- dim(obesidad)
-
 ```
 
 ```{r echo = FALSE}
@@ -78,6 +77,7 @@ val <- test_val[indices.val, ]
 ```
 
 # k-NN
+```{r}
 # Función k-NN con distancia euclides
 mi_knn <- function(train, test, cl, k = 5) {
   # Verificamos que las dimensiones estan bien
@@ -114,8 +114,11 @@ mi_knn <- function(train, test, cl, k = 5) {
   return(predicciones)
 }
 
-# Análisis Discriminante Lineal.
+```
 
+
+# Análisis Discriminante Lineal.
+```{r}
 mi_lda <- function(X, y) {
   # Convertir a matriz si es necesario
   if (!is.matrix(X)) X <- as.matrix(X)
@@ -186,6 +189,8 @@ predict.mi_lda_model <- function(object, newdata, ...) {
   # Predecir la clase con mayor discriminante
   object$classes[max.col(discriminants)]
 }
+```
+
 
 # Bagging
 
@@ -337,7 +342,8 @@ prediccion_oob <- function(modelos, oob_indices, data) {
   
 ```
 
-# Implementación de Boosting (versión Adaboost)
+
+# Boosting (versión Adaboost)
 
 Primero vamos a explicar los pasos:
 
@@ -397,14 +403,17 @@ df_test <- copy_test[tabla_preds]
 
 # Función AdaBoost
 adaboost_train_rpart <- function(df, M) {
-  n <- nrow(df)
-  w <- rep(1/n, n)
-  stumps <- vector("list", M)
-  alphas <- numeric(M)
-  K <- length(levels(df$y))
+  n <- nrow(df)                 # Numero de observaciones
+  w <- rep(1/n, n)              # Pesos iniciales iguales para todos
+  stumps <- vector("list", M)   # Lista para almacenar los árboles
+  alphas <- numeric(M)          # Vector para los coeficientes alpha
+  K <- length(levels(df$y))     # Número de clases
   
+  # Entrenamiento de un árbol de profundidad 1
   for (m in seq_len(M)) {
     stump <- rpart(y ~ ., data = df, weights = w, control = rpart.control(maxdepth = 1, cp = 0, minsplit = 2))
+    
+    # Predicciones en el conjunto de train
     pred_factor <- predict(stump, df, type = "class")
     pred_num <- as.numeric(pred_factor) - 1
     y_num <- as.numeric(df$y) - 1
@@ -413,36 +422,39 @@ adaboost_train_rpart <- function(df, M) {
     err <- sum(w * (pred_num != y_num))
     err <- pmin(pmax(err, 1e-10), 1 - 1e-10)
     
-    # Coeficiente alpha
+    # Coeficiente alpha ajustado para multiclase
     alphas[m] <- log((1 - err)/err) + log(K - 1)
     
     # Actualizar pesos
     w <- w * exp(alphas[m] * (pred_num != y_num))
     w <- w / sum(w)
     
+    # Guardar el árbol entrenado
     stumps[[m]] <- stump
   }
   list(stumps = stumps, alphas = alphas, K = K)
 }
 
-# Función de predicción
+# Función para predecir con el modelo AdaBoost entrenado
 adaboost_predict_rpart <- function(model, df) {
-  M <- length(model$alphas)
-  n <- nrow(df)
-  scores <- matrix(0, n, model$K)
+  M <- length(model$alphas)        # Número de árboles entrenados
+  n <- nrow(df)                    # Número de observaciones a predecir
+  scores <- matrix(0, n, model$K)  # Matriz de puntuaciones por clase
   
   for (m in seq_len(M)) {
+    # Predicción de cada árbol
     pred_factor <- predict(model$stumps[[m]], df, type = "class")
     pred_num <- as.numeric(pred_factor) - 1
+    # Acumular la "contrubución" del arbol a la puntuación de cada clase
     for (k in 0:(model$K - 1)) {scores[, k+1] <- scores[, k+1] + model$alphas[m] * (pred_num == k)}
   }
-  
+  # La predicción es la clase con más puntuaciones
   apply(scores, 1, which.max) - 1
 }
 
 # Tiempo
 time_taken <- system.time({model_ab <- adaboost_train_rpart(df_train, M = 10)})
-cat(sprintf("Tiempo de entrenamiento: %.2f s\n", time_taken[3]))
+# cat(sprintf("Tiempo de entrenamiento: %.2f s\n", time_taken[3]))
 
 # Predicciones y accuracy
 datos_pred <- df_test
