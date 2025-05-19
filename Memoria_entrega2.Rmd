@@ -1055,5 +1055,56 @@ En conclusión, Random Forest es el más equilibrado y potente, Bagging se queda
 
 Es por eso que el modelo más potente y del cual obtenemos un rendimiento y una capacidad predictiva casi perfecta es el Random Forest.
 
+Ahora que ya hemos elegido el modelo que mejor se ajusta a nuestros datos de obesidad, vamos a evaluarlo en el conjunto validacion
+
+```{r}
+# Nos aseguramos de que validacion tenga las mismas columnas y tipos que train (excepto la clase)
+for (col in names(train)) {
+  if (col %in% names(val)) {
+    if (is.factor(train[[col]])) {
+      val[[col]] <- factor(val[[col]], levels = levels(train[[col]]))
+    } else if (is.numeric(train[[col]])) {
+      val[[col]] <- as.numeric(val[[col]])
+    }
+  }
+}
+
+
+
+# Predecimos
+pred_rf <- predict(rf, newdata = val)
+library(caret)
+
+# Nos aseguramos de que val tenga los mismos niveles para la variable respuesta
+val$NObeyesdad <- factor(val$NObeyesdad, levels = levels(train$NObeyesdad))
+
+# predicciones
+pred_rf <- predict(rf, newdata = val)
+
+# Evaluar con matriz de confusión
+conf_rf <- confusionMatrix(pred_rf, val$NObeyesdad)
+
+# Mostrar resultados
+print(conf_rf)
+
+
+```
+
+Evaluando el modelo en validación este alcanza un rendimiento excelente con unos valores de accuracy y Kappa que superan a los resultados obtenido en test.
+
+```         
+Accuracy : 0.9551
+```
+
+```         
+Kappa : 0.9475           
+```
+
+La sensibilidad media es muy alta también, con un valor de 0,95, lo cual inidca identifica bien la mayoria de los casos en todas las clases.
+La especificidad también destaca con un 99,4%, moestrando que el modelocasi no comete falsos positivos.
+
+Comparado con los resultados en test, donde Random Forest ya esra el más exacto, al evaluar en validación se ha reafirmado su fiabilidaz.
+Es claramente el más consistente frente a otros modelos, por lo que demuestra ser el modelo con el mejor rendimiento.
+
 
 
