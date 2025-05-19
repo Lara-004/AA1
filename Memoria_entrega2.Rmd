@@ -111,7 +111,7 @@ Dado nuestro problema, que es averiguar el nivel de obesidad de las personas seg
 # 2. Entrenamiento de modelos y programación
 
 
-## 2.1 Modelos
+## Modelos
 
 
 ### k-NN
@@ -911,7 +911,7 @@ print(confusion_test)
 Al comparar el modelo Naive Bayes implementando la función propia de R (naivebayes) con la función programada podemos observar una diferencia muy significativa en el rendimiento. El modelo de R logra una precisión del 72,5% y un coeficiente Kappa de 0,6775, mientras que el modelo manual apenas alcanza un 11,6% de acierto y un Kappa practicamente nulo por lo que su rendimiento no supera al azar. En el modelo automático, hay clases que hemos observado anteriormente se clasifican con gran precisión, mientras que en el modelo manual casi ninguna clase se identifica correctamente, predominan las predicciones erróneas concentradas en la clase Peso Normal. Esta diferencia se debe a que el modelo de R optimiza automáticamente los cálculos, maneja variables de forma más robusta y controla mas la distribución y el suavizado.
 
 
-# Comparación de Modelos
+# 3. Comparación de Modelos
 
 En este bloque vamos a determinar cuál de todos es el más adecuado, en cuantro a métricas, para predecir el nivel de obesidad de forma más precisa.
 
@@ -1055,6 +1055,11 @@ En conclusión, Random Forest es el más equilibrado y potente, Bagging se queda
 
 Es por eso que el modelo más potente y del cual obtenemos un rendimiento y una capacidad predictiva casi perfecta es el Random Forest.
 
+
+# 4. Conclusiones y trabajo a futuro.
+
+## Análisis en el conjunto de validación del modelo Random Forest
+
 Ahora que ya hemos elegido el modelo que mejor se ajusta a nuestros datos de obesidad, vamos a evaluarlo en el conjunto validacion
 
 ```{r}
@@ -1068,8 +1073,6 @@ for (col in names(train)) {
     }
   }
 }
-
-
 
 # Predecimos
 pred_rf <- predict(rf, newdata = val)
@@ -1086,11 +1089,9 @@ conf_rf <- confusionMatrix(pred_rf, val$NObeyesdad)
 
 # Mostrar resultados
 print(conf_rf)
-
-
 ```
 
-Evaluando el modelo en validación este alcanza un rendimiento excelente con unos valores de accuracy y Kappa que superan a los resultados obtenido en test.
+Evaluando el modelo en validación este alcanza un rendimiento excelente con unos valores de accuracy y Kappa que superan incluso los resultados obtenido en test.
 
 ```         
 Accuracy : 0.9551
@@ -1100,12 +1101,37 @@ Accuracy : 0.9551
 Kappa : 0.9475           
 ```
 
-La sensibilidad media es muy alta también, con un valor de 0,95, lo cual inidca identifica bien la mayoria de los casos en todas las clases.
-La especificidad también destaca con un 99,4%, moestrando que el modelocasi no comete falsos positivos.
+La sensibilidad media es muy alta también, con un valor de 0,95, lo cual indica que el modelo identifica bien la mayoría de los casos en todas las clases.
+La especificidad también destaca con un 99,4%, mostrando que el modelo casi no comete falsos positivos.
 
-Comparado con los resultados en test, donde Random Forest ya era el más exacto, al evaluar en validación se ha reafirmado su fiabilidaz. Es claramente el más consistente frente a otros modelos, por lo que demuestra ser el modelo con el mejor rendimiento. Además, ofrece interpretabilidad mediante la importancia de variables, donde destacan el peso la altura y edad, lo que refuerza por tanto la coherencia del modelo sobre que estas variables son cruciales para clasificar los niveles de obesidad.
+Comparado con los resultados en test, donde Random Forest ya era el más exacto, al evaluar en validación se ha reafirmado su fiabilidad. Es claramente el más consistente frente a otros modelos, por lo que demuestra ser el modelo con el mejor rendimiento. 
 
-Tras analizar y modelar el conjunto de datos de obesidad, aplicar diversas técnicas, abordar distintos modelos y evaluar su rendimiento con distintas métricas, hemos podido sacar conclusiones sobre ellos. Los resultados a lo largo del trabajo han mostrado que las variables más determinantes para clasificar la edad son el peso, la altua y la edad, lo que concuerda con los conocimientos médicos acerca de la obesidad de hoy en dia. También hemos podido detectar como algunas clases de obesidad como Sobre Peso Nivel l y Nivel ll han presentado mas dificultades para clasificarse, por ser mas cercanas, mientras que Obesdiad de tipo 3 y Peso insuficiente se identifican con mucha más facilidad. En definitiva, tras aplicar todos estos modelos, técnicas y compararlas, destacando Random Forest que nos permite obtener las predicciones más precisas y generalizables, los resultados obtenidos han sido útiles y nos han permitido sacar conclusiones acerca de la obesidad que podrían aplicarse en entornos reales.
+Además, ofrece interpretabilidad mediante la importancia de variables, donde destacan el peso, la altura y la edad, lo que refuerza por tanto la coherencia del modelo sobre que estas variables son cruciales para clasificar los niveles de obesidad.
+
+
+## Conclusiones y propuestas de mejoras
+
+Tras analizar y modelar el conjunto de datos de obesidad, aplicar diversas técnicas, abordar distintos modelos y evaluar su rendimiento con distintas métricas, hemos podido sacar conclusiones sobre ellos. 
+
+Los resultados a lo largo del trabajo han mostrado que las variables más determinantes para clasificar la edad son el peso, la altura y la edad, lo que concuerda con los conocimientos médicos acerca de la obesidad de hoy en dia. 
+
+También hemos podido detectar como algunas clases de obesidad como Sobre Peso Nivel I y Nivel II han presentado mas dificultades para clasificarse, por ser mas cercanas, mientras que Obesdiad de tipo III y Peso insuficiente se identifican con mucha más facilidad. 
+
+En definitiva, tras aplicar todos estos modelos, técnicas y compararlas, destacando Random Forest que nos permite obtener las predicciones más precisas y generalizables, los resultados obtenidos han sido útiles y nos han permitido sacar conclusiones acerca de la obesidad que podrían aplicarse en entornos reales.
+
+Algunas mejoras que podríamos añadir sería, si se pudiese, ampliar el número de variables (añadir horas de sueño, trabajo, etc) que podría sernos de bastante utilidad para así hacer un estudio más en profundidad, poder  captar aún mejor la complejidad de la obesidad
+
+
+## Trabajo a Futuro
+
+Desarrollar modelos que incorporen series temporales de peso y hábitos ((por ejemplo, mediante Redes Neuronales) para predecir trayectorias de riesgo de obesidad a lo largo del tiempo.
+
+Implementación de un prototipo de herramienta web o aplicación móvil que permita la carga de datos por parte de profesionales sanitarios y ofrezca predicciones y recomendaciones inmediatas a los usuarios.
+
+Establecer un proceso de reentrenamiento a medida que se recolecten nuevos datos, para mantener la precisión y adaptabilidad de los modelos a cambios en la población o en los hábitos de vida y así que nuestro modelo pueda no acabar obsoleto y siga recibiendo estas actualizaciones de datos de pacientes y usuarios para mejorar el modelo y que siga siendo útil para la sociedad.
+
+Colaboración con profesionales sanitarios (médicos, nutricionistas o dietistas) y así poder incorporar su feedback para ajustar las características (por ejemplo, nuevos indicadores clínicos) y validar que las predicciones sean útiles y realistas en la práctica. Con esto también podríamos organizar sesiones de revisión periódicas para asegurar que el modelo evolucione acorde a los avances médicos y las necesidades de los pacientes consiguiendo de esta forma un mayor impacto real.
+
 
 
 
