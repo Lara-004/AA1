@@ -1133,7 +1133,9 @@ Establecer un proceso de reentrenamiento a medida que se recolecten nuevos datos
 Colaboración con profesionales sanitarios (médicos, nutricionistas o dietistas) y así poder incorporar su feedback para ajustar las características (por ejemplo, nuevos indicadores clínicos) y validar que las predicciones sean útiles y realistas en la práctica. Con esto también podríamos organizar sesiones de revisión periódicas para asegurar que el modelo evolucione acorde a los avances médicos y las necesidades de los pacientes consiguiendo de esta forma un mayor impacto real.
 
 
-##Division del trabajo
-Los modelos bagging y Naive Bayes han sido desarrollados por Carmen Liberal. La comparación de modelos ha sido realizada por Lara Montero. Las conclusiones sobre validación, conclusion final y trabajo a futuro han sido realizadas por Carmen Liberal y Lara Montero.
+## Division del trabajo
+Los modelos bagging y Naive Bayes han sido desarrollados por Carmen Liberal. 
+Los modelos Boosting, Arboles de Decisión, Random Forest desarrollados por Lara Montero.
+La comparación de modelos ha sido realizada por Lara Montero. Las conclusiones sobre validación, conclusion final y trabajo a futuro han sido realizadas por Carmen Liberal y Lara Montero.
 
 
