@@ -1134,6 +1134,7 @@ Colaboración con profesionales sanitarios (médicos, nutricionistas o dietistas
 
 
 ## Division del trabajo
+Los modelos de knn y lda  han sido desarrollados por Marcos López.
 Los modelos bagging y Naive Bayes han sido desarrollados por Carmen Liberal. 
 Los modelos Boosting, Arboles de Decisión, Random Forest desarrollados por Lara Montero.
 La comparación de modelos ha sido realizada por Lara Montero. Las conclusiones sobre validación, conclusion final y trabajo a futuro han sido realizadas por Carmen Liberal y Lara Montero.
