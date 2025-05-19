@@ -563,7 +563,7 @@ En cada división interna del árbol, se consideran 4 variables predictoras, lo 
 
 Además, en la matriz de confusión se muestra como la gran mayoria de las clases de obesidad se clasifican con alta precisión. Todas las clases de obesidad tienen una tasa de error parecida y baja, destacan Obesidad Tipo 1, cuya tasa de error es del 0%, clasificándose correctamente en todos los casos. Por otro lado, Sobrepeso Nivel 1 es la que mayor tipo de error presenta, de un 16,86%, lo que sugiere que es el que mayores disficultades presenta a la hora de clasificar.
 
-Continuamos evaluando visualmente la convergencia del modelo, para anlizar el comportamiento del modelo según se agregan árboles al conjunto.
+Continuamos evaluando visualmente la convergencia del modelo, para analizar el comportamiento del modelo según se agregan árboles al conjunto.
 
 ```{r}
 plot(rf)
