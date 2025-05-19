@@ -1103,8 +1103,9 @@ Kappa : 0.9475
 La sensibilidad media es muy alta también, con un valor de 0,95, lo cual inidca identifica bien la mayoria de los casos en todas las clases.
 La especificidad también destaca con un 99,4%, moestrando que el modelocasi no comete falsos positivos.
 
-Comparado con los resultados en test, donde Random Forest ya esra el más exacto, al evaluar en validación se ha reafirmado su fiabilidaz.
-Es claramente el más consistente frente a otros modelos, por lo que demuestra ser el modelo con el mejor rendimiento.
+Comparado con los resultados en test, donde Random Forest ya era el más exacto, al evaluar en validación se ha reafirmado su fiabilidaz. Es claramente el más consistente frente a otros modelos, por lo que demuestra ser el modelo con el mejor rendimiento. Además, ofrece interpretabilidad mediante la importancia de variables, donde destacan el peso la altura y edad, lo que refuerza por tanto la coherencia del modelo sobre que estas variables son cruciales para clasificar los niveles de obesidad.
+
+Tras analizar y modelar el conjunto de datos de obesidad, aplicar diversas técnicas, abordar distintos modelos y evaluar su rendimiento con distintas métricas, hemos podido sacar conclusiones sobre ellos. Los resultados a lo largo del trabajo han mostrado que las variables más determinantes para clasificar la edad son el peso, la altua y la edad, lo que concuerda con los conocimientos médicos acerca de la obesidad de hoy en dia. También hemos podido detectar como algunas clases de obesidad como Sobre Peso Nivel l y Nivel ll han presentado mas dificultades para clasificarse, por ser mas cercanas, mientras que Obesdiad de tipo 3 y Peso insuficiente se identifican con mucha más facilidad. En definitiva, tras aplicar todos estos modelos, técnicas y compararlas, destacando Random Forest que nos permite obtener las predicciones más precisas y generalizables, los resultados obtenidos han sido útiles y nos han permitido sacar conclusiones acerca de la obesidad que podrían aplicarse en entornos reales.
 
 
 
